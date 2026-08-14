@@ -1,0 +1,13 @@
+name: MothRecorder
+title: MothRecorder
+username: beale
+account: beale
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17693457
+bundleId: 12401287
+url: https://beale.shinyapps.io/MothRecorder/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: master_moth_records.csv|MothRecorder.R

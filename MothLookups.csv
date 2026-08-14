@@ -1,0 +1,154 @@
+﻿Method,Sex,Stage,Status,Confidential,Quantity Qualifier,Vice-county
+Actinic light,Male,Adult,Accidental,Yes,Exact,1-West Cornwall
+At rest,Female,"Adult, Dead",Adventive,No,Estimate,2-East Cornwall
+Beaten,Not recorded,Case,Alien,,,3-South Devon
+Bred,Unknown,Cocoon,Breeding (confirmed),,,4-North Devon
+Daytime record,,Copulating pairs,Breeding (possible),,,5-South Somerset
+Documented record,,Dead,Breeding (probable),,,6-North Somerset
+Dusking,,Egg,Escape,,,7-North Wiltshire
+Field record,,Egg-batch,Established,,,8-South Wiltshire
+Indoor record,,Emergence holes,Introduced,,,9-Dorset
+"Ivy, ivy blossom",,Exuvia,Migrant,,,10-Isle of Wight
+LED light,,Gall,Not recorded,,,11-South Hampshire
+MV light,,Larval,Resident,,,12-North Hampshire
+Nectaring,,Larval feeding signs,Unknown,,,13-West Sussex
+Netted,,Larval spinning,Vagrant,,,14-East Sussex
+Not recorded,,Larval tube,Void,,,15-East Kent
+Pheromone lure,,Larval web,,,,16-West Kent
+Photographic record,,"Larval, Dead",,,,17-Surrey
+Reported to recorder,,Mine,,,,18-South Essex
+Rothamsted trap,,Mine (vacated),,,,19-North Essex
+Sallowing,,Nest,,,,20-Hertfordshire
+Standard survey,,Not recorded,,,,21-Middlesex
+Sugar,,Pupal,,,,22-Berkshire
+Swept,,Pupal exuviae,,,,23-Oxfordshire
+Torchlight,,"Pupal, Dead",,,,24-Buckinghamshire
+Various methods,,,,,,25-East Suffolk
+Voucher specimen,,,,,,26-West Suffolk
+Wine ropes,,,,,,27-East Norfolk
+,,,,,,28-West Norfolk
+,,,,,,29-Cambridgeshire
+,,,,,,30-Bedfordshire
+,,,,,,31-Huntingdonshire
+,,,,,,32-Northamptonshire
+,,,,,,33-East Gloucestershire
+,,,,,,34-West Gloucestershire
+,,,,,,35-Monmouthshire
+,,,,,,36-Herefordshire
+,,,,,,37-Worcestershire
+,,,,,,38-Warwickshire
+,,,,,,39-Staffordshire
+,,,,,,40-Shropshire
+,,,,,,41-Glamorganshire
+,,,,,,42-Breconshire
+,,,,,,43-Radnorshire
+,,,,,,44-Caerfyrddyn (Carmarthenshire)
+,,,,,,45-Pembrokeshire
+,,,,,,46-Ceredigion (Cardiganshire)
+,,,,,,47-Montgomeryshire
+,,,,,,48-Meirionydd (Merionithshire)
+,,,,,,49-Caernarfon (Caernarvonshire)
+,,,,,,50-Denbighshire
+,,,,,,51-Flintshire
+,,,,,,52-Anglesey
+,,,,,,53-South Lincolnshire
+,,,,,,54-North Lincolnshire
+,,,,,,55-Leicestershire & Rutland
+,,,,,,56-Nottinghamshire
+,,,,,,57-Derbyshire
+,,,,,,58-Cheshire
+,,,,,,59-South Lancashire
+,,,,,,60-West Lancashire
+,,,,,,61-South-east Yorkshire
+,,,,,,62-North-east Yorkshire
+,,,,,,63-South-west Yorkshire
+,,,,,,64-Mid-west Yorkshire
+,,,,,,65-North-west Yorkshire
+,,,,,,66-Durham
+,,,,,,67-South Northumberland
+,,,,,,68-North Northumberland (Cheviotland)
+,,,,,,69-Westmorland & North Lancashire
+,,,,,,70-Cumberland
+,,,,,,71-Isle of Man
+,,,,,,72-Dumfriesshire
+,,,,,,73-Kirkudbrightshire
+,,,,,,74-Wigtownshire
+,,,,,,75-Ayrshire
+,,,,,,76-Renfrewshire
+,,,,,,77-Lanarkshire
+,,,,,,78-Peebleshire
+,,,,,,79-Selkirkshire
+,,,,,,80-Roxburghshire
+,,,,,,81-Berwickshire
+,,,,,,82-East Lothian (Haddingtonshire)
+,,,,,,83-Midlothian (Edinburgh)
+,,,,,,84-West Lothian (Linlithgowshire)
+,,,,,,85-Fifeshire
+,,,,,,86-Stirlingshire
+,,,,,,87-West Perthshire
+,,,,,,88-Mid Perthshire
+,,,,,,89-East Perthshire
+,,,,,,90-Angus (Forfarshire)
+,,,,,,91-Kincardineshire
+,,,,,,92-South Aberdeenshire
+,,,,,,93-North Aberdeenshire
+,,,,,,94-Banffshire
+,,,,,,95-Moray (Elgin)
+,,,,,,96-East Inverness & Nairn (Easterness)
+,,,,,,97-West Inverness (Westerness)
+,,,,,,98-Main Argyll
+,,,,,,99-Dunbartonshire
+,,,,,,100-Clyde Islands
+,,,,,,101-Kintyre
+,,,,,,102-South Ebudes
+,,,,,,103-Mid Ebudes
+,,,,,,104-North Ebudes
+,,,,,,105-West Ross.
+,,,,,,106-East Ross.
+,,,,,,107-East Sutherland
+,,,,,,108-West Sutherland
+,,,,,,109-Caithness
+,,,,,,110-Outer Hebrides
+,,,,,,111-Orkney
+,,,,,,112-Shetland (Zetland)
+,,,,,,113-Channel Islands
+,,,,,,H1-South Kerry
+,,,,,,H2-North Kerry
+,,,,,,H3-West Cork
+,,,,,,H4-Mid Cork
+,,,,,,H5-East Cork
+,,,,,,H6-Waterford
+,,,,,,H7-South Tipperary
+,,,,,,H8-Limerick
+,,,,,,H9-Clare
+,,,,,,H10-North Tipperary
+,,,,,,H11-Kilkenny
+,,,,,,H12-Wexford
+,,,,,,H13-Carlow
+,,,,,,H14-Leix (Queen's County)
+,,,,,,H15-South-east Galway
+,,,,,,H16-West Galway
+,,,,,,H17-North-east Galway
+,,,,,,H18-Offlay (King's County)
+,,,,,,H19-Kildare
+,,,,,,H20-Wicklow
+,,,,,,H21-Dublin
+,,,,,,H22-Meath
+,,,,,,H23-West Meath
+,,,,,,H24-Longford
+,,,,,,H25-Roscommon
+,,,,,,H26-East Mayo
+,,,,,,H27-West Mayo
+,,,,,,H28-Sligo
+,,,,,,H29-Leitrim
+,,,,,,H30-Cavan
+,,,,,,H31-Louth
+,,,,,,H32-Monaghan
+,,,,,,H33-Fermanagh
+,,,,,,H34-East Donegal
+,,,,,,H35-West Donegal
+,,,,,,H36-Tyrone
+,,,,,,H37-Armagh
+,,,,,,H38-Down
+,,,,,,H39-Antrim
+,,,,,,H40-Londonderry
