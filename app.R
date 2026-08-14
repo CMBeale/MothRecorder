@@ -11,7 +11,7 @@ library(DT)
 # ==============================================================================
 
 SITES_FILE <- "sites.csv"
-RECORDS_FILE <- "master_moth_records.csv"
+RECORDS_FILE <- "/srv/data/MothRecorder/master_moth_records.csv"
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
