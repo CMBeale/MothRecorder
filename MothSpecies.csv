@@ -66,7 +66,7 @@ ersan,2.008,12,Eriocrania sangii,Large Birch Purple,Micro-moth,4,sangii
 large birch purple,2.008,12,Eriocrania sangii,Large Birch Purple,Micro-moth,4,sangii
 3.001,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
 15,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
-orange swift,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
+osw,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
 triodia sylvina,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
 trsyl,3.001,15,Triodia sylvina,Orange Swift,Macro-moth,1,sylvina
 3.002,3.002,17,Korscheltellus lupulina,Common Swift,Macro-moth,1,lupulina
@@ -1770,7 +1770,7 @@ phcit,15.0931,,Phyllocnistis citrella,Citrus Leaf-miner,Micro-moth,3,citrella
 phyllocnistis citrella,15.0931,,Phyllocnistis citrella,Citrus Leaf-miner,Micro-moth,3,citrella
 16.001,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
 424,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
-bird-cherry ermine,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
+bce,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
 ypevo,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
 yponomeuta evonymella,16.001,424,Yponomeuta evonymella,Bird-cherry Ermine,Micro-moth,1,evonymella
 16.002,16.002,425,Yponomeuta padella,Orchard Ermine,Micro-moth,2,padella
@@ -4603,10 +4603,10 @@ blastobasis phycidella,41.001,875,Blastobasis phycidella,Hampshire Dowd,Micro-mo
 blphy,41.001,875,Blastobasis phycidella,Hampshire Dowd,Micro-moth,3,phycidella
 hampshire dowd,41.001,875,Blastobasis phycidella,Hampshire Dowd,Micro-moth,3,phycidella
 41.002,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
-873,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
+Common Masoner,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
 bladu,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
 blastobasis adustella,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
-dingy dowd,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
+dd,41.002,873,Blastobasis adustella,Dingy Dowd,Micro-moth,2,adustella
 41.003,41.003,874,Blastobasis lacticolella,London Dowd,Micro-moth,2,lacticolella
 874,41.003,874,Blastobasis lacticolella,London Dowd,Micro-moth,2,lacticolella
 blastobasis lacticolella,41.003,874,Blastobasis lacticolella,London Dowd,Micro-moth,2,lacticolella
@@ -5873,7 +5873,7 @@ ceruf,49.16,1065,Celypha rufana,Lakes Marble,Micro-moth,3,rufana
 lakes marble,49.16,1065,Celypha rufana,Lakes Marble,Micro-moth,3,rufana
 49.161,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
 1063,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
-barred marble,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
+bm,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
 celypha striana,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
 cestr,49.161,1063,Celypha striana,Barred Marble,Micro-moth,1,striana
 49.162,49.162,1064,Celypha rosaceana,Roseate Marble,Micro-moth,2,rosaceana
@@ -7377,7 +7377,7 @@ warted knot-horn,62.034,1436,Acrobasis repandana,Warted Knot-horn,Micro-moth,2,r
 1439,62.035,1439,Acrobasis advenella,Grey Knot-horn,Micro-moth,2,advenella
 acadv,62.035,1439,Acrobasis advenella,Grey Knot-horn,Micro-moth,2,advenella
 acrobasis advenella,62.035,1439,Acrobasis advenella,Grey Knot-horn,Micro-moth,2,advenella
-grey knot-horn,62.035,1439,Acrobasis advenella,Grey Knot-horn,Micro-moth,2,advenella
+gkh,62.035,1439,Acrobasis advenella,Grey Knot-horn,Micro-moth,2,advenella
 62.036,62.036,1438,Acrobasis suavella,Thicket Knot-horn,Micro-moth,2,suavella
 1438,62.036,1438,Acrobasis suavella,Thicket Knot-horn,Micro-moth,2,suavella
 acrobasis suavella,62.036,1438,Acrobasis suavella,Thicket Knot-horn,Micro-moth,2,suavella
@@ -7816,7 +7816,7 @@ udea olivalis,63.037,1392,Udea olivalis,Olive Pearl,Micro-moth,1,olivalis
 udoli,63.037,1392,Udea olivalis,Olive Pearl,Micro-moth,1,olivalis
 63.038,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
 1405,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
-mother of pearl,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
+mop,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
 parur,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
 patania ruralis,63.038,1405,Patania ruralis,Mother of Pearl,Micro-moth,1,ruralis
 63.0381,63.0381,1407,Pleuroptya aegrotalis,African Pearl,Micro-moth,3,aegrotalis
@@ -7949,9 +7949,9 @@ eupup2,63.0561,,Eustixia pupula,American Cabbage Pearl,Micro-moth,3,pupula
 eustixia pupula,63.0561,,Eustixia pupula,American Cabbage Pearl,Micro-moth,3,pupula
 63.057,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
 1356,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
-evergestis forficalis,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
+garpe,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
 evfor,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
-garden pebble,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
+gp,63.057,1356,Evergestis forficalis,Garden Pebble,Micro-moth,1,forficalis
 63.058,63.058,1357,Evergestis extimalis,Marbled Yellow Pearl,Micro-moth,1,extimalis
 1357,63.058,1357,Evergestis extimalis,Marbled Yellow Pearl,Micro-moth,1,extimalis
 evergestis extimalis,63.058,1357,Evergestis extimalis,Marbled Yellow Pearl,Micro-moth,1,extimalis
@@ -8386,7 +8386,7 @@ scarce hook-tip,65.006,1650,Sabra harpagula,Scarce Hook-tip,Macro-moth,1,harpagu
 1651,65.007,1651,Cilix glaucata,Chinese Character,Macro-moth,1,glaucata
 chinese character,65.007,1651,Cilix glaucata,Chinese Character,Macro-moth,1,glaucata
 cigla,65.007,1651,Cilix glaucata,Chinese Character,Macro-moth,1,glaucata
-cilix glaucata,65.007,1651,Cilix glaucata,Chinese Character,Macro-moth,1,glaucata
+cc,65.007,1651,Cilix glaucata,Chinese Character,Macro-moth,1,glaucata
 65.008,65.008,1652,Thyatira batis,Peach Blossom,Macro-moth,1,batis
 1652,65.008,1652,Thyatira batis,Peach Blossom,Macro-moth,1,batis
 peach blossom,65.008,1652,Thyatira batis,Peach Blossom,Macro-moth,1,batis
@@ -9550,7 +9550,7 @@ thyme pug,70.172,1843,Eupithecia distinctaria,Thyme Pug,Macro-moth,2,distinctari
 1825,70.173,1825,Eupithecia centaureata,Lime-speck Pug,Macro-moth,1,centaureata
 eucen,70.173,1825,Eupithecia centaureata,Lime-speck Pug,Macro-moth,1,centaureata
 eupithecia centaureata,70.173,1825,Eupithecia centaureata,Lime-speck Pug,Macro-moth,1,centaureata
-lime-speck pug,70.173,1825,Eupithecia centaureata,Lime-speck Pug,Macro-moth,1,centaureata
+lsp,70.173,1825,Eupithecia centaureata,Lime-speck Pug,Macro-moth,1,centaureata
 70.174,70.174,1820,Eupithecia insigniata,Pinion-spotted Pug,Macro-moth,1,insigniata
 1820,70.174,1820,Eupithecia insigniata,Pinion-spotted Pug,Macro-moth,1,insigniata
 euins,70.174,1820,Eupithecia insigniata,Pinion-spotted Pug,Macro-moth,1,insigniata
@@ -9860,14 +9860,14 @@ enaln,70.234,1913,Ennomos alniaria,Canary-shouldered Thorn,Macro-moth,1,alniaria
 ennomos alniaria,70.234,1913,Ennomos alniaria,Canary-shouldered Thorn,Macro-moth,1,alniaria
 70.235,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
 1914,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
-dusky thorn,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
+dt,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
 enfus,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
 ennomos fuscantaria,70.235,1914,Ennomos fuscantaria,Dusky Thorn,Macro-moth,1,fuscantaria
 70.236,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
 1915,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
 enero,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
 ennomos erosaria,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
-september thorn,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
+st,70.236,1915,Ennomos erosaria,September Thorn,Macro-moth,2,erosaria
 70.2361,70.2361,1916a,Ennomos subsignaria,Elm Spanworm,Macro-moth,Ungraded,subsignaria
 1916a,70.2361,1916a,Ennomos subsignaria,Elm Spanworm,Macro-moth,Ungraded,subsignaria
 elm spanworm,70.2361,1916a,Ennomos subsignaria,Elm Spanworm,Macro-moth,Ungraded,subsignaria
@@ -10338,7 +10338,7 @@ leucodonta bicoloria,71.019,2012,Leucodonta bicoloria,White Prominent,Macro-moth
 white prominent,71.019,2012,Leucodonta bicoloria,White Prominent,Macro-moth,1,bicoloria
 71.02,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
 2011,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
-pale prominent,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
+pp,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
 pterostoma palpina,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
 ptpal,71.02,2011,Pterostoma palpina,Pale Prominent,Macro-moth,1,palpina
 71.021,71.021,2008,Ptilodon capucina,Coxcomb Prominent,Macro-moth,1,capucina
@@ -10530,7 +10530,7 @@ disan,72.023,2059,Diacrisia sannio,Clouded Buff,Macro-moth,1,sannio
 72.024,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
 2064,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
 phful2,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
-phragmatobia fuliginosa,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
+rt,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
 ruby tiger,72.024,2064,Phragmatobia fuliginosa,Ruby Tiger,Macro-moth,1,fuliginosa
 72.025,72.025,2056,Parasemia plantaginis,Wood Tiger,Macro-moth,1,plantaginis
 2056,72.025,2056,Parasemia plantaginis,Wood Tiger,Macro-moth,1,plantaginis
@@ -11043,7 +11043,7 @@ psinc,73.0211,2435a,Pseudoplusia includens,Soybean Looper,Macro-moth,Ungraded,in
 soybean looper,73.0211,2435a,Pseudoplusia includens,Soybean Looper,Macro-moth,Ungraded,includens
 73.022,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
 2439,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
-gold spot,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
+gs,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
 plfes,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
 plusia festucae,73.022,2439,Plusia festucae,Gold Spot,Macro-moth,2,festucae
 73.023,73.023,2440,Plusia putnami,Lempke's Gold Spot,Macro-moth,2,putnami
@@ -11115,7 +11115,7 @@ marbled tuffet,73.0321,2426,Charadra deridens,Marbled Tuffet,Macro-moth,Ungraded
 2020,73.033,2020,Diloba caeruleocephala,Figure of Eight,Macro-moth,1,caeruleocephala
 dicae,73.033,2020,Diloba caeruleocephala,Figure of Eight,Macro-moth,1,caeruleocephala
 diloba caeruleocephala,73.033,2020,Diloba caeruleocephala,Figure of Eight,Macro-moth,1,caeruleocephala
-figure of eight,73.033,2020,Diloba caeruleocephala,Figure of Eight,Macro-moth,1,caeruleocephala
+f8,73.033,2020,Diloba caeruleocephala,Figure of Eight,Macro-moth,1,caeruleocephala
 73.0331,73.0331,2427,Raphia frater,Brother,Macro-moth,Ungraded,frater
 2427,73.0331,2427,Raphia frater,Brother,Macro-moth,Ungraded,frater
 brother,73.0331,2427,Raphia frater,Brother,Macro-moth,Ungraded,frater
@@ -11181,7 +11181,7 @@ sweet gale moth,73.044,2288,Acronicta cinerea,Sweet Gale Moth,Macro-moth,2,ciner
 2289,73.045,2289,Acronicta rumicis,Knot Grass,Macro-moth,2,rumicis
 acronicta rumicis,73.045,2289,Acronicta rumicis,Knot Grass,Macro-moth,2,rumicis
 acrum,73.045,2289,Acronicta rumicis,Knot Grass,Macro-moth,2,rumicis
-knot grass,73.045,2289,Acronicta rumicis,Knot Grass,Macro-moth,2,rumicis
+kg,73.045,2289,Acronicta rumicis,Knot Grass,Macro-moth,2,rumicis
 73.046,73.046,2278,Subacronicta megacephala,Poplar Grey,Macro-moth,2,megacephala
 2278,73.046,2278,Subacronicta megacephala,Poplar Grey,Macro-moth,2,megacephala
 poplar grey,73.046,2278,Subacronicta megacephala,Poplar Grey,Macro-moth,2,megacephala
@@ -11196,7 +11196,7 @@ crlig,73.047,2291,Craniophora ligustri,Coronet,Macro-moth,1,ligustri
 2397,73.048,2397,Panemeria tenebrata,Small Yellow Underwing,Macro-moth,2,tenebrata
 panemeria tenebrata,73.048,2397,Panemeria tenebrata,Small Yellow Underwing,Macro-moth,2,tenebrata
 paten,73.048,2397,Panemeria tenebrata,Small Yellow Underwing,Macro-moth,2,tenebrata
-small yellow underwing,73.048,2397,Panemeria tenebrata,Small Yellow Underwing,Macro-moth,2,tenebrata
+smyu,73.048,2397,Panemeria tenebrata,Small Yellow Underwing,Macro-moth,2,tenebrata
 73.049,73.049,2395,Synthymia fixa,Goldwing,Macro-moth,2,fixa
 2395,73.049,2395,Synthymia fixa,Goldwing,Macro-moth,2,fixa
 goldwing,73.049,2395,Synthymia fixa,Goldwing,Macro-moth,2,fixa
@@ -11270,7 +11270,7 @@ stilbia anomala,73.061,2394,Stilbia anomala,Anomalous,Macro-moth,1,anomala
 2297,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
 amphipyra pyramidea,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
 ampyr,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
-copper underwing,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
+copu,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
 cu,73.062,2297,Amphipyra pyramidea,Copper Underwing,Macro-moth,2,pyramidea
 73.063,73.063,2298,Amphipyra berbera,Svensson's Copper Underwing,Macro-moth,2,berbera
 2298,73.063,2298,Amphipyra berbera,Svensson's Copper Underwing,Macro-moth,2,berbera
@@ -11394,7 +11394,7 @@ marbled grey,73.083,2294,Bryophila raptricula,Marbled Grey,Macro-moth,1,raptricu
 2293,73.084,2293,Bryophila domestica,Marbled Beauty,Macro-moth,2,domestica
 brdom2,73.084,2293,Bryophila domestica,Marbled Beauty,Macro-moth,2,domestica
 bryophila domestica,73.084,2293,Bryophila domestica,Marbled Beauty,Macro-moth,2,domestica
-marbled beauty,73.084,2293,Bryophila domestica,Marbled Beauty,Macro-moth,2,domestica
+mb,73.084,2293,Bryophila domestica,Marbled Beauty,Macro-moth,2,domestica
 73.085,73.085,2295,Bryopsis muralis,Marbled Green,Macro-moth,Ungraded,muralis
 2295,73.085,2295,Bryopsis muralis,Marbled Green,Macro-moth,Ungraded,muralis
 brmur,73.085,2295,Bryopsis muralis,Marbled Green,Macro-moth,Ungraded,muralis
@@ -11407,7 +11407,7 @@ pseudeustrotia candidula,73.086,2413a,Pseudeustrotia candidula,Shining Marbled,M
 shining marbled,73.086,2413a,Pseudeustrotia candidula,Shining Marbled,Macro-moth,1,candidula
 73.087,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
 2385,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
-small mottled willow,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
+smw,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
 spexi,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
 spodoptera exigua,73.087,2385,Spodoptera exigua,Small Mottled Willow,Macro-moth,1,exigua
 73.088,73.088,2386c,Spodoptera cilium,Dark Mottled Willow,Macro-moth,3,cilium
@@ -11483,8 +11483,8 @@ powdered rustic,73.098,2383,Hoplodrina superstes,Powdered Rustic,Macro-moth,4,su
 73.099,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
 2384,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
 hoamb,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
-hoplodrina ambigua,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
-vine's rustic,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
+vr,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
+vines rustic,73.099,2384,Hoplodrina ambigua,Vine's Rustic,Macro-moth,2,ambigua
 73.1,73.1,2391,Chilodes maritima,Silky Wainscot,Macro-moth,1,maritima
 2391,73.1,2391,Chilodes maritima,Silky Wainscot,Macro-moth,1,maritima
 chilodes maritima,73.1,2391,Chilodes maritima,Silky Wainscot,Macro-moth,1,maritima
@@ -11604,7 +11604,7 @@ gortyna borelii,73.122,2365,Gortyna borelii,Fisher's Estuarine Moth,Macro-moth,1
 2361,73.123,2361,Hydraecia micacea,Rosy Rustic,Macro-moth,1,micacea
 hydraecia micacea,73.123,2361,Hydraecia micacea,Rosy Rustic,Macro-moth,1,micacea
 hymic,73.123,2361,Hydraecia micacea,Rosy Rustic,Macro-moth,1,micacea
-rosy rustic,73.123,2361,Hydraecia micacea,Rosy Rustic,Macro-moth,1,micacea
+rr,73.123,2361,Hydraecia micacea,Rosy Rustic,Macro-moth,1,micacea
 73.124,73.124,2362,Hydraecia petasitis,Butterbur,Macro-moth,2,petasitis
 2362,73.124,2362,Hydraecia petasitis,Butterbur,Macro-moth,2,petasitis
 butterbur,73.124,2362,Hydraecia petasitis,Butterbur,Macro-moth,2,petasitis
@@ -11643,7 +11643,7 @@ luperina dumerilii,73.13,2355,Luperina dumerilii,Dumeril's Rustic,Macro-moth,2,d
 73.131,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
 2353,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
 flounced rustic,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
-luperina testacea,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
+fr,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
 lutes,73.131,2353,Luperina testacea,Flounced Rustic,Macro-moth,1,testacea
 73.132,73.132,2354,Luperina nickerlii,Sandhill Rustic,Macro-moth,2,nickerlii
 2354,73.132,2354,Luperina nickerlii,Sandhill Rustic,Macro-moth,2,nickerlii
@@ -12452,9 +12452,9 @@ mycon,73.29,2192,Mythimna conigera,Brown-line Bright-eye,Macro-moth,1,conigera
 mythimna conigera,73.29,2192,Mythimna conigera,Brown-line Bright-eye,Macro-moth,1,conigera
 73.291,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
 2199/2200,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
-common wainscot,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
+cw,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
 mypal,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
-mythimna pallens,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
+cowai,73.291,2199/2200,Mythimna pallens,Common Wainscot,Macro-moth,2,pallens
 73.293,73.293,2198,Mythimna impura,Smoky Wainscot,Macro-moth,2,impura
 2198,73.293,2198,Mythimna impura,Smoky Wainscot,Macro-moth,2,impura
 myimp,73.293,2198,Mythimna impura,Smoky Wainscot,Macro-moth,2,impura
@@ -12634,7 +12634,7 @@ crescent dart,73.324,2090,Agrotis trux,Crescent Dart,Macro-moth,1,trux
 2092,73.325,2092,Agrotis puta,Shuttle-shaped Dart,Macro-moth,1,puta
 agput2,73.325,2092,Agrotis puta,Shuttle-shaped Dart,Macro-moth,1,puta
 agrotis puta,73.325,2092,Agrotis puta,Shuttle-shaped Dart,Macro-moth,1,puta
-shuttle-shaped dart,73.325,2092,Agrotis puta,Shuttle-shaped Dart,Macro-moth,1,puta
+ssd,73.325,2092,Agrotis puta,Shuttle-shaped Dart,Macro-moth,1,puta
 73.326,73.326,2092a,Agrotis catalaunensis,Grouville Dart,Macro-moth,Ungraded,catalaunensis
 2092a,73.326,2092a,Agrotis catalaunensis,Grouville Dart,Macro-moth,Ungraded,catalaunensis
 agcat,73.326,2092a,Agrotis catalaunensis,Grouville Dart,Macro-moth,Ungraded,catalaunensis
@@ -12656,7 +12656,7 @@ axylia putris,73.328,2098,Axylia putris,Flame,Macro-moth,1,putris
 flame,73.328,2098,Axylia putris,Flame,Macro-moth,1,putris
 73.329,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
 2102,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
-flame shoulder,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
+fs,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
 ochropleura plecta,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
 ocple,73.329,2102,Ochropleura plecta,Flame Shoulder,Macro-moth,1,plecta
 73.33,73.33,2102a,Ochropleura leucogaster,Radford's Flame Shoulder,Macro-moth,3,leucogaster
@@ -12809,9 +12809,9 @@ xestia xanthographa,73.357,2134,Xestia xanthographa,Square-spot Rustic,Macro-mot
 xexan,73.357,2134,Xestia xanthographa,Square-spot Rustic,Macro-moth,1,xanthographa
 73.358,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
 2133,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
-sisr,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
+ssr,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
 xesex,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
-xestia sexstrigata,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
+6sr,73.358,2133,Xestia sexstrigata,Six-striped Rustic,Macro-moth,1,sexstrigata
 73.359,73.359,2126,Xestia c-nigrum,Setaceous Hebrew Character,Macro-moth,1,c-nigrum
 2126,73.359,2126,Xestia c-nigrum,Setaceous Hebrew Character,Macro-moth,1,c-nigrum
 setaceous hebrew character,73.359,2126,Xestia c-nigrum,Setaceous Hebrew Character,Macro-moth,1,c-nigrum

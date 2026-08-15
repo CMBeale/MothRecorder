@@ -96,6 +96,9 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
   }
   
   raw_df <- read_csv(file_path, show_col_types = FALSE)
+  # Sanitize invalid UTF-8 bytes in species CSV
+  raw_df <- raw_df %>% mutate(across(where(is.character), ~ iconv(.x, to = "UTF-8", sub = "")))
+  
   cols <- colnames(raw_df)
   
   get_col <- function(patterns) {
@@ -162,12 +165,13 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
     out$Shortcut[i] <- paste(unique(existing_keys), collapse = ", ")
   }
   
-  # Calculate recording frequency from master records file
+  # Calculate recording frequency from master records file safely
   rec_counts <- data.frame(Taxon = character(), RecFreq = integer(), stringsAsFactors = FALSE)
   if (file.exists(records_file)) {
-    rec_df <- tryCatch(read_csv(records_file, show_col_types = FALSE), error = function(e) NULL)
+    rec_df <- tryCatch(read_csv(records_file, show_col_types = FALSE, col_types = cols(.default = "c")), error = function(e) NULL)
     if (!is.null(rec_df) && nrow(rec_df) > 0 && "Taxon" %in% colnames(rec_df)) {
       rec_counts <- rec_df %>%
+        mutate(Taxon = iconv(Taxon, to = "UTF-8", sub = "")) %>%
         filter(!is.na(Taxon) & nchar(trimws(Taxon)) > 0) %>%
         group_by(Taxon = trimws(Taxon)) %>%
         summarize(RecFreq = n(), .groups = "drop")
@@ -240,6 +244,17 @@ ui <- page_navbar(
   id = "main_nav",
   theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#2c3e50"),
   
+  tags$head(
+    tags$style(HTML("
+      /* Light highlight background ONLY for the species dropdown */
+      #species-select-wrapper .selectize-dropdown .option.active,
+      #species-select-wrapper .selectize-dropdown .active {
+        background-color: #e2e8f0 !important; /* Soft light slate/grey background */
+      }
+    "))
+  ),
+  
+  
   # --- TAB 1: SESSION SETUP ---
   nav_panel(
     title = "1. Session Setup",
@@ -262,7 +277,7 @@ ui <- page_navbar(
       ),
       card(
         card_header("Session Metadata"),
-        dateInput("rec_date", "Trapping Date (Trap ON Date)", value = Sys.Date(), format = "dd/mm/yyyy"),
+        dateInput("rec_date", "Trapping Date (Trap ON Date)", value = Sys.Date()-1, format = "dd/mm/yyyy"),
         textInput("observer", "Observer(s) (Max 64 chars)", value = "A. Recorder"),
         selectInput("sampling_method", "Sampling Method", choices = NULL),
         selectInput("life_stage", "Life Stage", choices = NULL)
@@ -280,13 +295,16 @@ ui <- page_navbar(
         width = 12, lg = 5,
         card(
           card_header("Add Moth to Current Day"),
-          selectizeInput(
-            "species_input", 
-            "Search Species (Shortcut, Common, Scientific, Code):", 
-            choices = NULL, 
-            options = list(
-              placeholder = "Type e.g. 'lyu', 'nopro', 'Yellow Belle'...",
-              maxOptions = 50
+          div(
+            id = "species-select-wrapper",
+            selectizeInput(
+              "species_input", 
+              "Search Species (Shortcut, Common, Scientific, Code):", 
+              choices = NULL, 
+              options = list(
+                placeholder = "Type e.g. 'lyu', 'nopro', 'Yellow Belle'...",
+                maxOptions = 50
+              )
             )
           ),
           numericInput("box_count", "Quantity to Add (This Box/Count):", value = 1, min = 1, step = 1),
@@ -383,10 +401,10 @@ server <- function(input, output, session) {
     updateSelectInput(session, "site_select", choices = st$Site)
   })
   
-  # Load Master Data Frame into memory
+  # Load Master Data Frame into memory safely as character vectors
   load_master_df <- function() {
     if (file.exists(RECORDS_FILE)) {
-      df <- read_csv(RECORDS_FILE, show_col_types = FALSE)
+      df <- read_csv(RECORDS_FILE, show_col_types = FALSE, col_types = cols(.default = "c"))
       for (col in BC_COLUMNS) {
         if (!col %in% colnames(df)) df[[col]] <- ""
       }
@@ -410,10 +428,20 @@ server <- function(input, output, session) {
     req(nrow(sp) > 0)
     
     sp_options <- lapply(seq_len(nrow(sp)), function(i) {
+      # Map Grade column to specific CSS hex/color values
+      g_color <- switch(as.character(sp$Grade[i]),
+                        "1" = "#006400",  # Dark Green
+                        "2" = "#0000FF",  # Blue
+                        "3" = "#FF8C00",  # Dark Orange
+                        "4" = "#FF0000",  # Red
+                        "#000000"         # Default Fallback (Black)
+      )
+      
       list(
         value = sp$Taxon[i],
         label = paste0(sp$Vernacular[i], " (", sp$Taxon[i], ")"),
         sort_order = i,
+        color = g_color,
         search_str = paste(
           sp$Vernacular[i], 
           sp$Taxon[i], 
@@ -436,7 +464,15 @@ server <- function(input, output, session) {
         searchField = c("label", "search_str"),
         sortField = list(list(field = "sort_order", direction = "asc")),
         placeholder = "Type species name, code or shortcut...",
-        maxOptions = 50
+        maxOptions = 50,
+        render = I('{
+          option: function(item, escape) {
+            return \'<div class="option" style="color:\' + escape(item.color) + \'; font-weight: 600;">\' + escape(item.label) + \'</div>\';
+          },
+          item: function(item, escape) {
+            return \'<div class="item" style="color:\' + escape(item.color) + \'; font-weight: 600;">\' + escape(item.label) + \'</div>\';
+          }
+        }')
       ),
       server = FALSE
     )
@@ -551,21 +587,21 @@ server <- function(input, output, session) {
     apply_factor_dropdowns(df, lookups_data())
   })
   
-  # Sync formatted data to editable state
-  observe({
+  # Sync formatted data to editable state ONLY when new counts are added
+  observeEvent(session_counts(), {
     req(nrow(session_counts()) > 0)
     export_data_val(formatted_export_data())
-  })
+  }, ignoreInit = TRUE)
   
-  # Handle manual inline table edits in Tab 3
+  # Handle manual inline table edits in Tab 3 safely without factor level corruption
   observeEvent(input$review_export_table_cell_edit, {
     info <- input$review_export_table_cell_edit
-    current_df <- export_data_val()
+    current_df <- export_data_val() %>% mutate(across(where(is.factor), as.character))
     updated_df <- DT::editData(current_df, info, rownames = FALSE)
-    export_data_val(updated_df)
+    export_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
-  # Render interactive DT table for Tab 3
+  # Render interactive DT table for Tab 3 (disabled sorting to keep index mapping safe)
   output$review_export_table <- renderDT({
     req(nrow(export_data_val()) > 0)
     datatable(
@@ -575,20 +611,21 @@ server <- function(input, output, session) {
       options = list(
         pageLength = 25,
         scrollX = TRUE,
-        dom = 't'
+        dom = 't',
+        ordering = FALSE
       )
     )
   })
   
-  # Handle manual inline table edits in Tab 4
+  # Handle manual inline table edits in Tab 4 safely without factor level corruption
   observeEvent(input$master_records_table_cell_edit, {
     info <- input$master_records_table_cell_edit
-    current_df <- master_data_val()
+    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
     updated_df <- DT::editData(current_df, info, rownames = FALSE)
-    master_data_val(updated_df)
+    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
-  # Render interactive DT table for Tab 4 (Master Database)
+  # Render interactive DT table for Tab 4 (disabled sorting to keep index mapping safe)
   output$master_records_table <- renderDT({
     req(nrow(master_data_val()) > 0)
     datatable(
@@ -598,7 +635,8 @@ server <- function(input, output, session) {
       options = list(
         pageLength = 25,
         scrollX = TRUE,
-        dom = 'fltip'
+        dom = 'fltip',
+        ordering = FALSE
       )
     )
   })
