@@ -1,3 +1,5 @@
+## THis version to be run on the server - must include the records file path
+
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -5,13 +7,15 @@ library(readr)
 library(stringr)
 library(lubridate)
 library(DT)
+library(ggplot2)
 
 # ==============================================================================
 # 1. FILE PATHS & DATA LOADERS
 # ==============================================================================
 
 SITES_FILE <- "sites.csv"
-RECORDS_FILE <- "/srv/data/MothRecorder/master_moth_records.csv"
+#RECORDS_FILE <- "/srv/data/MothRecorder/master_moth_records.csv"  # must be used on server
+RECORDS_FILE <- "master_moth_records.csv"                          # use only for local testing
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
