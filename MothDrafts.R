@@ -1,7 +1,3 @@
-## This version runs locally and on shiny.io, but not on the York server
-## Used for testing and prototype.
-## Paths to records file will always differ from server: /srv/data/MothRecorder/
-
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -20,7 +16,12 @@ RECORDS_FILE <- "master_moth_records.csv"
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
-# Load lookups directly from Mothlookups.csv
+# Configure server backup directory with local fallback
+TEMP_DIR <- if (dir.exists("/srv/data/MothRecorder")) "/srv/data/MothRecorder" else "temp_saves"
+if (!dir.exists(TEMP_DIR)) {
+  dir.create(TEMP_DIR, recursive = TRUE, showWarnings = FALSE)
+}
+
 load_lookups <- function(file_path) {
   defaults <- list(
     vice_counties = c("61-South-east Yorkshire", "5-South Somerset", "62-North-east Yorkshire"),
@@ -31,7 +32,6 @@ load_lookups <- function(file_path) {
   )
   
   if (!file.exists(file_path)) {
-    # Write initial fallback file with padded columns so rows align cleanly
     max_len <- 5
     vc_p <- c(defaults$vice_counties, rep("", max_len - length(defaults$vice_counties)))
     me_p <- c(defaults$methods, rep("", max_len - length(defaults$methods)))
@@ -101,7 +101,6 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
   }
   
   raw_df <- read_csv(file_path, show_col_types = FALSE)
-  # Sanitize invalid UTF-8 bytes in species CSV
   raw_df <- raw_df %>% mutate(across(where(is.character), ~ iconv(.x, to = "UTF-8", sub = "")))
   
   cols <- colnames(raw_df)
@@ -163,14 +162,12 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
       .groups = "drop"
     )
   
-  # Strictly use preset shortcuts defined in the CSV without auto-generating extra keys
   for (i in seq_len(nrow(out))) {
     existing_keys <- unlist(strsplit(out$Shortcut[i], ",\\s*"))
     existing_keys <- existing_keys[nchar(existing_keys) > 0]
     out$Shortcut[i] <- paste(unique(existing_keys), collapse = ", ")
   }
   
-  # Calculate recording frequency from master records file safely
   rec_counts <- data.frame(Taxon = character(), RecFreq = integer(), stringsAsFactors = FALSE)
   if (file.exists(records_file)) {
     rec_df <- tryCatch(read_csv(records_file, show_col_types = FALSE, col_types = cols(.default = "c")), error = function(e) NULL)
@@ -183,7 +180,6 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
     }
   }
   
-  # Order species by frequency (descending), then alphabetically by Taxon for ties/0 records
   out <- out %>%
     left_join(rec_counts, by = "Taxon") %>%
     mutate(RecFreq = ifelse(is.na(RecFreq), 0, RecFreq)) %>%
@@ -192,7 +188,6 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
   
   return(out)
 }
-
 
 BC_COLUMNS <- c(
   "Shortcut", "Code", "Vernacular", "Taxon", "Grade",
@@ -208,31 +203,25 @@ if (!file.exists(RECORDS_FILE)) {
   write_csv(empty_master, RECORDS_FILE)
 }
 
-# Helper to bind factor levels for DT inline dropdown editing
 apply_factor_dropdowns <- function(df, lookups) {
   if (nrow(df) == 0) return(df)
   
-  # Sex column dropdown
   sex_opts <- unique(c("", trimws(as.character(df[["Sex"]])), lookups$sex))
   sex_opts <- sex_opts[!is.na(sex_opts) & (nchar(sex_opts) > 0 | sex_opts == "")]
   df[["Sex"]] <- factor(df[["Sex"]], levels = sex_opts)
   
-  # Life stage column dropdown
   stage_opts <- unique(c("", trimws(as.character(df[["Life stage"]])), lookups$stage))
   stage_opts <- stage_opts[!is.na(stage_opts) & (nchar(stage_opts) > 0 | stage_opts == "")]
   df[["Life stage"]] <- factor(df[["Life stage"]], levels = stage_opts)
   
-  # Record status column dropdown
   status_opts <- unique(c("", trimws(as.character(df[["Record status"]])), lookups$status))
   status_opts <- status_opts[!is.na(status_opts) & (nchar(status_opts) > 0 | status_opts == "")]
   df[["Record status"]] <- factor(df[["Record status"]], levels = status_opts)
   
-  # Abundance qualifier column dropdown
   qual_opts <- unique(c("", trimws(as.character(df[["Abundance qualifier"]])), c("Exact", "Estimate")))
   qual_opts <- qual_opts[!is.na(qual_opts) & (nchar(qual_opts) > 0 | qual_opts == "")]
   df[["Abundance qualifier"]] <- factor(df[["Abundance qualifier"]], levels = qual_opts)
   
-  # Confidential column dropdown
   conf_opts <- unique(c("", trimws(as.character(df[["Confidential"]])), c("No", "Yes")))
   conf_opts <- conf_opts[!is.na(conf_opts) & (nchar(conf_opts) > 0 | conf_opts == "")]
   df[["Confidential"]] <- factor(df[["Confidential"]], levels = conf_opts)
@@ -251,14 +240,40 @@ ui <- page_navbar(
   
   tags$head(
     tags$style(HTML("
-      /* Light highlight background ONLY for the species dropdown */
-      #species-select-wrapper .selectize-dropdown .option.active,
-      #species-select-wrapper .selectize-dropdown .active {
-        background-color: #e2e8f0 !important; /* Soft light slate/grey background */
-      }
-    "))
+    #species-select-wrapper .selectize-dropdown .option.active,
+    #species-select-wrapper .selectize-dropdown .active {
+      background-color: #e2e8f0 !important;
+    }
+    
+    /* Stepper container styling */
+    .stepper-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    .stepper-container .shiny-input-container {
+      margin-bottom: 0 !important;
+      width: 100px;
+    }
+    .stepper-container input {
+      text-align: center;
+      font-weight: bold;
+    }
+    .btn-stepper {
+      width: 40px;
+      height: 38px;
+      padding: 0;
+      font-size: 1.25rem;
+      font-weight: bold;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+  "))
   ),
-  
   
   # --- TAB 1: SESSION SETUP ---
   nav_panel(
@@ -278,7 +293,9 @@ ui <- page_navbar(
           selectInput("new_vc", "Vice-County", choices = NULL)
         ),
         hr(),
-        actionButton("btn_start_session", "Lock Info & Start Quick Entry", class = "btn-primary w-100")
+        actionButton("btn_start_session", "Lock Info & Start Quick Entry", class = "btn-primary w-100"),
+        br(), br(),
+        actionButton("recover_btn", "Help, I lost my connection!", class = "btn-warning w-100")
       ),
       card(
         card_header("Session Metadata"),
@@ -312,7 +329,12 @@ ui <- page_navbar(
               )
             )
           ),
-          numericInput("box_count", "Quantity to Add (This Box/Count):", value = 1, min = 1, step = 1),
+          div(
+            class = "stepper-container",
+            actionButton("minus_one", "-", class = "btn btn-outline-secondary btn-stepper"),
+            numericInput("count", label = NULL, value = 1, min = 1),
+            actionButton("plus_one", "+", class = "btn btn-primary btn-stepper")
+          ),
           textInput("entry_comment", "Specimen Comment (Optional)", placeholder = "e.g. worn adult, in box 3"),
           br(),
           actionButton("btn_add_count", "Add to Day Count", class = "btn-success btn-lg w-100"),
@@ -330,7 +352,6 @@ ui <- page_navbar(
     )
   ),
   
-  # --- TAB 3: REVIEW & EXPORT ---
   # --- TAB 3: REVIEW & EXPORT ---
   nav_panel(
     title = "3. Export Data",
@@ -396,6 +417,7 @@ ui <- page_navbar(
     )
   )
 )
+
 # ==============================================================================
 # 3. SERVER LOGIC
 # ==============================================================================
@@ -406,7 +428,81 @@ server <- function(input, output, session) {
   species_df <- reactiveVal(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
   lookups_data <- reactiveVal(load_lookups(LOOKUPS_FILE))
   
-  # Render active session summary text banner
+  session_counts <- reactiveVal(data.frame(
+    Taxon = character(),
+    Count = integer(),
+    Comment = character(),
+    stringsAsFactors = FALSE
+  ))
+  
+  # Tracks active temp file path to ensure precise cleanup on append
+  active_temp_file <- reactiveVal(NULL)
+  
+  export_data_val <- reactiveVal(data.frame())
+  master_data_val <- reactiveVal(data.frame())
+  
+  # Helper function for temporary backup file naming
+  get_temp_filepath <- function(site, date_str) {
+    clean_site <- gsub("[^A-Za-z0-9]", "_", site)
+    file.path(TEMP_DIR, paste0("temp_", clean_site, "_", date_str, ".rds"))
+  }
+  
+  # Increment/Decrement count buttons
+  observeEvent(input$plus_one, {
+    current <- ifelse(is.na(input$count), 0, input$count)
+    updateNumericInput(session, "count", value = current + 1)
+  })
+  
+  observeEvent(input$minus_one, {
+    current <- ifelse(is.na(input$count), 1, input$count)
+    updateNumericInput(session, "count", value = max(1, current - 1))
+  })
+  
+  # Session Recovery Modal Trigger
+  # Session Recovery Modal Trigger
+  observeEvent(input$recover_btn, {
+    temp_files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$")
+    
+    if (length(temp_files) == 0) {
+      showModal(modalDialog(
+        title = "No Saved Sessions Found",
+        "No uncommitted temporary session backups were found on the server.",
+        easyClose = TRUE
+      ))
+    } else {
+      showModal(modalDialog(
+        title = "Recover Lost Session",
+        size = "l", # Expands modal container width
+        selectInput(
+          "selected_recovery_file", 
+          "Select your Site & Date session backup:", 
+          choices = temp_files,
+          width = "100%" # Forces select box to fill 100% of the expanded modal width
+        ),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("confirm_recovery", "Restore Session Data", class = "btn-success")
+        )
+      ))
+    }
+  })
+  
+  # Session Data Restore Action
+  observeEvent(input$confirm_recovery, {
+    req(input$selected_recovery_file)
+    filepath <- file.path(TEMP_DIR, input$selected_recovery_file)
+    
+    if (file.exists(filepath)) {
+      restored_data <- readRDS(filepath)
+      session_counts(restored_data)
+      active_temp_file(filepath) # Track restored file for post-append deletion
+      removeModal()
+      showNotification("Session tally successfully restored!", type = "message")
+      nav_select("main_nav", "tab_counter")
+    }
+  })
+  
+  # Session Summary Banner
   output$session_summary_banner <- renderUI({
     counts <- session_counts()
     
@@ -421,31 +517,16 @@ server <- function(input, output, session) {
     )
   })
   
-  session_counts <- reactiveVal(data.frame(
-    Taxon = character(),
-    Count = integer(),
-    Comment = character(),
-    stringsAsFactors = FALSE
-  ))
-  
-  export_data_val <- reactiveVal(data.frame())
-  master_data_val <- reactiveVal(data.frame())
-  
-  # Populate Lookups into Setup Tab inputs
+  # Setup Dropdowns
   observe({
     lk <- lookups_data()
-    
-    # Update Vice-County choices in Add Site menu from Vice-county column
     updateSelectInput(session, "new_vc", choices = lk$vice_counties)
     
-    # Update Sampling Method choices from Method column, defaulting to LED light
     default_method <- lk$methods[1]
     led_match <- grep("LED", lk$methods, ignore.case = TRUE, value = TRUE)
     if (length(led_match) > 0) default_method <- led_match[1]
     
     updateSelectInput(session, "sampling_method", choices = lk$methods, selected = default_method)
-    
-    # Update Life stage choices from Stage column
     updateSelectInput(session, "life_stage", choices = lk$stage, selected = if ("Adult" %in% lk$stage) "Adult" else lk$stage[1])
   })
   
@@ -454,7 +535,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "site_select", choices = st$Site)
   })
   
-  # Load Master Data Frame into memory safely as character vectors
   load_master_df <- function() {
     if (file.exists(RECORDS_FILE)) {
       df <- read_csv(RECORDS_FILE, show_col_types = FALSE, col_types = cols(.default = "c"))
@@ -475,19 +555,17 @@ server <- function(input, output, session) {
     master_data_val(load_master_df())
   })
   
-  # Clean display labels, full background shortcut search with explicitly mapped sort_order
   observe({
     sp <- species_df()
     req(nrow(sp) > 0)
     
     sp_options <- lapply(seq_len(nrow(sp)), function(i) {
-      # Map Grade column to specific CSS hex/color values
       g_color <- switch(as.character(sp$Grade[i]),
-                        "1" = "#006400",  # Dark Green
-                        "2" = "#0000FF",  # Blue
-                        "3" = "#FF8C00",  # Dark Orange
-                        "4" = "#FF0000",  # Red
-                        "#000000"         # Default Fallback (Black)
+                        "1" = "#006400",
+                        "2" = "#0000FF",
+                        "3" = "#FF8C00",
+                        "4" = "#FF0000",
+                        "#000000"
       )
       
       list(
@@ -564,11 +642,12 @@ server <- function(input, output, session) {
     nav_select("main_nav", "tab_export")
   })
   
+  # ADD TO DAY COUNT ACTION WITH AUTO-SAVE BACKUP
   observeEvent(input$btn_add_count, {
-    req(input$species_input, input$box_count)
+    req(input$species_input, input$count)
     
     selected_taxon <- trimws(input$species_input)
-    add_qty <- as.integer(input$box_count)
+    add_qty <- as.integer(input$count)
     cmt <- trimws(input$entry_comment)
     
     curr <- session_counts()
@@ -590,7 +669,18 @@ server <- function(input, output, session) {
     
     session_counts(updated)
     
-    updateNumericInput(session, "box_count", value = 1)
+    # Auto-save session state to temporary backup file and record path
+    tryCatch({
+      site_name <- current_site_info()$Site
+      date_str <- format(input$rec_date, "%Y%m%d")
+      filepath <- get_temp_filepath(site_name, date_str)
+      saveRDS(updated, file = filepath)
+      active_temp_file(filepath)
+    }, error = function(e) {
+      warning("Auto-save backup failed: ", e$message)
+    })
+    
+    updateNumericInput(session, "count", value = 1)
     updateTextInput(session, "entry_comment", value = "")
     updateSelectizeInput(session, "species_input", selected = character(0))
   })
@@ -640,13 +730,11 @@ server <- function(input, output, session) {
     apply_factor_dropdowns(df, lookups_data())
   })
   
-  # Sync formatted data to editable state ONLY when new counts are added
   observeEvent(session_counts(), {
     req(nrow(session_counts()) > 0)
     export_data_val(formatted_export_data())
   }, ignoreInit = TRUE)
   
-  # Handle manual inline table edits in Tab 3 safely without factor level corruption
   observeEvent(input$review_export_table_cell_edit, {
     info <- input$review_export_table_cell_edit
     current_df <- export_data_val() %>% mutate(across(where(is.factor), as.character))
@@ -654,7 +742,6 @@ server <- function(input, output, session) {
     export_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
-  # Render interactive DT table for Tab 3 (disabled sorting to keep index mapping safe)
   output$review_export_table <- renderDT({
     req(nrow(export_data_val()) > 0)
     datatable(
@@ -670,7 +757,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Handle manual inline table edits in Tab 4 safely without factor level corruption
   observeEvent(input$master_records_table_cell_edit, {
     info <- input$master_records_table_cell_edit
     current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
@@ -678,7 +764,6 @@ server <- function(input, output, session) {
     master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
-  # Render interactive DT table for Tab 4 (disabled sorting to keep index mapping safe)
   output$master_records_table <- renderDT({
     req(nrow(master_data_val()) > 0)
     datatable(
@@ -694,13 +779,31 @@ server <- function(input, output, session) {
     )
   })
   
-  # Save session export data to master file
+  # APPEND TO MASTER & CLEAN UP BACKUP FILES
   observeEvent(input$btn_save_master, {
     out_df <- export_data_val()
     req(nrow(out_df) > 0)
     
     out_df <- out_df %>% mutate(across(where(is.factor), as.character))
     write_csv(out_df, RECORDS_FILE, append = TRUE)
+    
+    # Clean up auto-save backup files after appending
+    tryCatch({
+      # 1. Remove tracked active temp file if present
+      if (!is.null(active_temp_file()) && file.exists(active_temp_file())) {
+        file.remove(active_temp_file())
+      }
+      
+      # 2. Check and remove any file matching current site/date metadata
+      site_name <- current_site_info()$Site
+      date_str <- format(input$rec_date, "%Y%m%d")
+      calc_filepath <- get_temp_filepath(site_name, date_str)
+      if (file.exists(calc_filepath)) {
+        file.remove(calc_filepath)
+      }
+      
+      active_temp_file(NULL)
+    }, error = function(e) NULL)
     
     session_counts(data.frame(
       Taxon = character(), 
@@ -711,14 +814,12 @@ server <- function(input, output, session) {
     export_data_val(data.frame())
     master_data_val(load_master_df())
     
-    # Update species dropdown order based on new master recording frequencies
     species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
     
     showNotification("Records saved to master spreadsheet! Session reset.", type = "message", duration = 5)
     nav_select("main_nav", "tab_setup")
   })
   
-  # Save manual edits in Master Database tab directly to master file
   observeEvent(input$btn_save_master_edits, {
     out_df <- master_data_val()
     req(nrow(out_df) > 0)
@@ -726,7 +827,6 @@ server <- function(input, output, session) {
     out_df <- out_df %>% mutate(across(where(is.factor), as.character))
     write_csv(out_df, RECORDS_FILE)
     
-    # Update species dropdown order based on modified master records
     species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
     
     showNotification("Master records spreadsheet updated successfully!", type = "message", duration = 5)
@@ -752,7 +852,6 @@ server <- function(input, output, session) {
   # 4. TAB 5: VISUALISATION LOGIC
   # ==============================================================================
   
-  # Populate Site choices from master data
   observe({
     df <- master_data_val()
     if (is.null(df) || nrow(df) == 0) {
@@ -770,7 +869,6 @@ server <- function(input, output, session) {
     updateSelectInput(session, "viz_site", choices = sort(sites))
   })
   
-  # Populate species choices filtered strictly by selected site & species-level resolution
   observe({
     req(input$viz_site)
     df <- master_data_val()
@@ -786,7 +884,7 @@ server <- function(input, output, session) {
         Vernacular = trimws(iconv(Vernacular, to = "UTF-8", sub = ""))
       ) %>%
       filter(!is.na(Taxon) & nchar(Taxon) > 0) %>%
-      filter(str_detect(Taxon, "\\s+")) %>% # Keep species-level only (2+ words)
+      filter(str_detect(Taxon, "\\s+")) %>%
       mutate(Display_Name = ifelse(!is.na(Vernacular) & nchar(Vernacular) > 0, Vernacular, Taxon)) %>%
       pull(Display_Name) %>%
       unique() %>%
@@ -795,13 +893,11 @@ server <- function(input, output, session) {
     updateSelectInput(session, "viz_species", choices = sp_list)
   })
   
-  # Render multi-year comparative trend plot
   output$trend_plot <- renderPlot({
     req(input$viz_site)
     df <- master_data_val()
     req(nrow(df) > 0)
     
-    # Filter by site, exclude single-word Taxon (Genus/Family), sum duplicate records per day
     site_raw <- df %>%
       filter(trimws(iconv(`Location (64)`, to = "UTF-8", sub = "")) == input$viz_site) %>%
       mutate(
@@ -811,21 +907,18 @@ server <- function(input, output, session) {
         Abundance_Num = suppressWarnings(as.numeric(Abundance))
       ) %>%
       filter(!is.na(Parsed_Date), !is.na(Abundance_Num)) %>%
-      filter(str_detect(Taxon, "\\s+")) # Keep species-level only (2+ words)
+      filter(str_detect(Taxon, "\\s+"))
     
     req(nrow(site_raw) > 0)
     
-    # Consolidate multiple records of same species on same date at this site
     site_df <- site_raw %>%
       group_by(Parsed_Date, Taxon, Vernacular) %>%
       summarize(Abundance_Num = sum(Abundance_Num, na.rm = TRUE), .groups = "drop") %>%
       mutate(
         Year = factor(format(Parsed_Date, "%Y")),
-        # Map dates to a fixed leap year (2000) for standard Jan 1 - Dec 31 x-axis alignment
         Dummy_Date = as.Date(paste0("2000-", format(Parsed_Date, "%m-%d")))
       )
     
-    # Extract trapping dates for the latest year available to build the rug plot
     latest_year <- max(as.numeric(as.character(site_df$Year)), na.rm = TRUE)
     rug_dates <- site_df %>%
       filter(Year == as.character(latest_year)) %>%
@@ -836,7 +929,6 @@ server <- function(input, output, session) {
       Dummy_Date = as.Date(paste0("2000-", format(rug_dates, "%m-%d")))
     )
     
-    # Base ggplot standardisation across metrics
     base_plot <- function(plot_data, y_title, plot_title) {
       ggplot(plot_data, aes(x = Dummy_Date, y = Metric, color = Year, group = Year)) +
         geom_line(linewidth = 0.9) +
@@ -886,19 +978,16 @@ server <- function(input, output, session) {
       base_plot(summary_df, "Unique Species Count", "Daily Species Richness")
       
     } else if (input$viz_metric == "cum_richness") {
-      # Calculate first appearance date of each species per year
       first_obs <- site_df %>%
         group_by(Year, Taxon) %>%
         summarize(First_Date = min(Parsed_Date), .groups = "drop") %>%
         group_by(Year, First_Date) %>%
         summarize(New_Species = n(), .groups = "drop")
       
-      # Extract all trapping days per year
       all_trap_days <- site_df %>%
         select(Year, Parsed_Date, Dummy_Date) %>%
         distinct()
       
-      # Merge and compute cumulative sum of newly added species
       summary_df <- all_trap_days %>%
         left_join(first_obs, by = c("Year", "Parsed_Date" = "First_Date")) %>%
         mutate(New_Species = ifelse(is.na(New_Species), 0, New_Species)) %>%
@@ -912,18 +1001,15 @@ server <- function(input, output, session) {
     } else if (input$viz_metric == "species") {
       req(input$viz_species)
       
-      # Extract all distinct trapping days per year at this site
       all_trap_days <- site_df %>%
         select(Parsed_Date, Year, Dummy_Date) %>%
         distinct()
       
-      # Filter species records
       spec_records <- site_df %>%
         filter(Vernacular == input$viz_species | Taxon == input$viz_species) %>%
         group_by(Parsed_Date) %>%
         summarize(Metric = sum(Abundance_Num, na.rm = TRUE), .groups = "drop")
       
-      # Fill 0 count for active trapping days where this species was absent
       summary_df <- all_trap_days %>%
         left_join(spec_records, by = "Parsed_Date") %>%
         mutate(Metric = ifelse(is.na(Metric), 0, Metric))
