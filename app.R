@@ -15,6 +15,7 @@ RECORDS_FILE <- "/srv/data/MothRecorder/master_moth_records.csv"
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
+
 # Load lookups directly from Mothlookups.csv
 load_lookups <- function(file_path) {
   defaults <- list(
@@ -326,12 +327,14 @@ ui <- page_navbar(
   ),
   
   # --- TAB 3: REVIEW & EXPORT ---
+  # --- TAB 3: REVIEW & EXPORT ---
   nav_panel(
     title = "3. Export Data",
     value = "tab_export",
     icon = icon("file-export"),
     card(
       card_header("Review & Edit Active Session Output"),
+      htmlOutput("session_summary_banner"),
       p(class = "text-muted small", "Double-click cells to edit. Dropdowns are available for Sex, Life stage, Record status, Abundance qualifier, and Confidential."),
       div(style = "overflow-x: auto;", DTOutput("review_export_table")),
       card_footer(
@@ -355,9 +358,40 @@ ui <- page_navbar(
         downloadButton("btn_download_master_csv", "Download Master CSV", class = "btn-outline-primary")
       )
     )
+  ),
+  
+  # --- TAB 5: VISUALISE DATA ---
+  nav_panel(
+    title = "5. Visualise Data",
+    value = "tab_viz",
+    icon = icon("chart-line"),
+    layout_sidebar(
+      sidebar = sidebar(
+        open = "always",
+        h5("Plot Controls"),
+        selectInput("viz_site", "Select Site:", choices = NULL),
+        selectInput(
+          "viz_metric", 
+          "Select Metric:", 
+          choices = c(
+            "Daily Total Abundance" = "abundance",
+            "Daily Species Richness" = "richness",
+            "Cumulative Species Richness" = "cum_richness",
+            "Individual Species Total" = "species"
+          )
+        ),
+        conditionalPanel(
+          condition = "input.viz_metric == 'species'",
+          selectInput("viz_species", "Select Species:", choices = NULL)
+        )
+      ),
+      card(
+        card_header("Annual Trends Comparison"),
+        plotOutput("trend_plot", height = "500px")
+      )
+    )
   )
 )
-
 # ==============================================================================
 # 3. SERVER LOGIC
 # ==============================================================================
@@ -367,6 +401,21 @@ server <- function(input, output, session) {
   sites_df <- reactiveVal(read_csv(SITES_FILE, show_col_types = FALSE))
   species_df <- reactiveVal(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
   lookups_data <- reactiveVal(load_lookups(LOOKUPS_FILE))
+  
+  # Render active session summary text banner
+  output$session_summary_banner <- renderUI({
+    counts <- session_counts()
+    
+    total_moths <- sum(counts$Count, na.rm = TRUE)
+    total_species <- length(unique(counts$Taxon[nchar(trimws(counts$Taxon)) > 0]))
+    
+    div(
+      class = "alert alert-primary mb-3",
+      style = "font-size: 1.15rem; font-weight: 600;",
+      sprintf("In this session you recorded %d moth%s of %d species.", 
+              total_moths, ifelse(total_moths == 1, "", "s"), total_species)
+    )
+  })
   
   session_counts <- reactiveVal(data.frame(
     Taxon = character(),
@@ -694,6 +743,190 @@ server <- function(input, output, session) {
       write_csv(df, file) 
     }
   )
+  
+  # ==============================================================================
+  # 4. TAB 5: VISUALISATION LOGIC
+  # ==============================================================================
+  
+  # Populate Site choices from master data
+  observe({
+    df <- master_data_val()
+    if (is.null(df) || nrow(df) == 0) {
+      updateSelectInput(session, "viz_site", choices = character(0))
+      return()
+    }
+    
+    sites <- df %>%
+      pull(`Location (64)`) %>%
+      iconv(to = "UTF-8", sub = "") %>%
+      trimws() %>%
+      unique()
+    
+    sites <- sites[nchar(sites) > 0]
+    updateSelectInput(session, "viz_site", choices = sort(sites))
+  })
+  
+  # Populate species choices filtered strictly by selected site & species-level resolution
+  observe({
+    req(input$viz_site)
+    df <- master_data_val()
+    if (is.null(df) || nrow(df) == 0) {
+      updateSelectInput(session, "viz_species", choices = character(0))
+      return()
+    }
+    
+    sp_list <- df %>%
+      filter(trimws(iconv(`Location (64)`, to = "UTF-8", sub = "")) == input$viz_site) %>%
+      mutate(
+        Taxon = trimws(iconv(Taxon, to = "UTF-8", sub = "")),
+        Vernacular = trimws(iconv(Vernacular, to = "UTF-8", sub = ""))
+      ) %>%
+      filter(!is.na(Taxon) & nchar(Taxon) > 0) %>%
+      filter(str_detect(Taxon, "\\s+")) %>% # Keep species-level only (2+ words)
+      mutate(Display_Name = ifelse(!is.na(Vernacular) & nchar(Vernacular) > 0, Vernacular, Taxon)) %>%
+      pull(Display_Name) %>%
+      unique() %>%
+      sort()
+    
+    updateSelectInput(session, "viz_species", choices = sp_list)
+  })
+  
+  # Render multi-year comparative trend plot
+  output$trend_plot <- renderPlot({
+    req(input$viz_site)
+    df <- master_data_val()
+    req(nrow(df) > 0)
+    
+    # Filter by site, exclude single-word Taxon (Genus/Family), sum duplicate records per day
+    site_raw <- df %>%
+      filter(trimws(iconv(`Location (64)`, to = "UTF-8", sub = "")) == input$viz_site) %>%
+      mutate(
+        Taxon = trimws(iconv(Taxon, to = "UTF-8", sub = "")),
+        Vernacular = trimws(iconv(Vernacular, to = "UTF-8", sub = "")),
+        Parsed_Date = as.Date(`Date (10)`, format = "%d/%m/%Y"),
+        Abundance_Num = suppressWarnings(as.numeric(Abundance))
+      ) %>%
+      filter(!is.na(Parsed_Date), !is.na(Abundance_Num)) %>%
+      filter(str_detect(Taxon, "\\s+")) # Keep species-level only (2+ words)
+    
+    req(nrow(site_raw) > 0)
+    
+    # Consolidate multiple records of same species on same date at this site
+    site_df <- site_raw %>%
+      group_by(Parsed_Date, Taxon, Vernacular) %>%
+      summarize(Abundance_Num = sum(Abundance_Num, na.rm = TRUE), .groups = "drop") %>%
+      mutate(
+        Year = factor(format(Parsed_Date, "%Y")),
+        # Map dates to a fixed leap year (2000) for standard Jan 1 - Dec 31 x-axis alignment
+        Dummy_Date = as.Date(paste0("2000-", format(Parsed_Date, "%m-%d")))
+      )
+    
+    # Extract trapping dates for the latest year available to build the rug plot
+    latest_year <- max(as.numeric(as.character(site_df$Year)), na.rm = TRUE)
+    rug_dates <- site_df %>%
+      filter(Year == as.character(latest_year)) %>%
+      pull(Parsed_Date) %>%
+      unique()
+    
+    rug_df <- data.frame(
+      Dummy_Date = as.Date(paste0("2000-", format(rug_dates, "%m-%d")))
+    )
+    
+    # Base ggplot standardisation across metrics
+    base_plot <- function(plot_data, y_title, plot_title) {
+      ggplot(plot_data, aes(x = Dummy_Date, y = Metric, color = Year, group = Year)) +
+        geom_line(linewidth = 0.9) +
+        geom_point(size = 2) +
+        geom_rug(
+          data = rug_df, 
+          aes(x = Dummy_Date), 
+          inherit.aes = FALSE, 
+          sides = "b", 
+          color = "#2c3e50", 
+          linewidth = 0.7,
+          length = unit(0.04, "npc")
+        ) +
+        scale_x_date(
+          date_labels = "%b", 
+          date_breaks = "1 month",
+          limits = c(as.Date("2000-01-01"), as.Date("2000-12-31")),
+          expand = c(0.01, 0.01)
+        ) +
+        labs(
+          title = plot_title,
+          subtitle = paste("Site:", input$viz_site),
+          caption = paste("Rug ticks on x-axis indicate trapping days in", latest_year),
+          x = "Date (Jan – Dec)",
+          y = y_title,
+          color = "Year"
+        ) +
+        theme_minimal(base_size = 14) +
+        theme(
+          panel.grid.minor = element_blank(),
+          plot.title = element_text(face = "bold")
+        )
+    }
+    
+    if (input$viz_metric == "abundance") {
+      summary_df <- site_df %>%
+        group_by(Year, Dummy_Date, Parsed_Date) %>%
+        summarize(Metric = sum(Abundance_Num, na.rm = TRUE), .groups = "drop")
+      
+      base_plot(summary_df, "Total Moth Count", "Daily Total Abundance")
+      
+    } else if (input$viz_metric == "richness") {
+      summary_df <- site_df %>%
+        group_by(Year, Dummy_Date, Parsed_Date) %>%
+        summarize(Metric = n_distinct(Taxon), .groups = "drop")
+      
+      base_plot(summary_df, "Unique Species Count", "Daily Species Richness")
+      
+    } else if (input$viz_metric == "cum_richness") {
+      # Calculate first appearance date of each species per year
+      first_obs <- site_df %>%
+        group_by(Year, Taxon) %>%
+        summarize(First_Date = min(Parsed_Date), .groups = "drop") %>%
+        group_by(Year, First_Date) %>%
+        summarize(New_Species = n(), .groups = "drop")
+      
+      # Extract all trapping days per year
+      all_trap_days <- site_df %>%
+        select(Year, Parsed_Date, Dummy_Date) %>%
+        distinct()
+      
+      # Merge and compute cumulative sum of newly added species
+      summary_df <- all_trap_days %>%
+        left_join(first_obs, by = c("Year", "Parsed_Date" = "First_Date")) %>%
+        mutate(New_Species = ifelse(is.na(New_Species), 0, New_Species)) %>%
+        arrange(Year, Parsed_Date) %>%
+        group_by(Year) %>%
+        mutate(Metric = cumsum(New_Species)) %>%
+        ungroup()
+      
+      base_plot(summary_df, "Cumulative Species Count", "Cumulative Species Richness")
+      
+    } else if (input$viz_metric == "species") {
+      req(input$viz_species)
+      
+      # Extract all distinct trapping days per year at this site
+      all_trap_days <- site_df %>%
+        select(Parsed_Date, Year, Dummy_Date) %>%
+        distinct()
+      
+      # Filter species records
+      spec_records <- site_df %>%
+        filter(Vernacular == input$viz_species | Taxon == input$viz_species) %>%
+        group_by(Parsed_Date) %>%
+        summarize(Metric = sum(Abundance_Num, na.rm = TRUE), .groups = "drop")
+      
+      # Fill 0 count for active trapping days where this species was absent
+      summary_df <- all_trap_days %>%
+        left_join(spec_records, by = "Parsed_Date") %>%
+        mutate(Metric = ifelse(is.na(Metric), 0, Metric))
+      
+      base_plot(summary_df, "Count", paste("Abundance Trend:", input$viz_species))
+    }
+  })
 }
 
 shinyApp(ui, server)
