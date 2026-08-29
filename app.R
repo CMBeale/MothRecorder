@@ -210,6 +210,38 @@ apply_factor_dropdowns <- function(df, lookups) {
   return(df)
 }
 
+# Helper to format RDS contents into Master structure
+format_temp_payload <- function(counts_df, meta, sp_ref, lookups) {
+  date_val <- if (!is.null(meta$date)) format(as.Date(meta$date), "%d/%m/%Y") else format(Sys.Date()-1, "%d/%m/%Y")
+  
+  df <- counts_df %>%
+    left_join(sp_ref, by = "Taxon") %>%
+    transmute(
+      `Shortcut` = Shortcut,
+      `Code` = ABH_Code,
+      `Vernacular` = Vernacular,
+      `Taxon` = Taxon,
+      `Grade` = Grade,
+      `Location (64)` = str_trunc(ifelse(!is.null(meta$site), meta$site, ""), 64),
+      `Grid reference (12)` = str_trunc(ifelse(!is.null(meta$grid_ref), meta$grid_ref, ""), 12),
+      `Vice-county` = ifelse(!is.null(meta$vice_county), meta$vice_county, ""),
+      `Observer(s) (64)` = str_trunc(ifelse(!is.null(meta$observer), meta$observer, ""), 64),
+      `Determiner (64)` = "",
+      `Date (10)` = date_val,
+      `Date Validator` = "",
+      `Abundance` = as.character(Count),
+      `Abundance qualifier` = "Exact",
+      `Sampling method` = ifelse(!is.null(meta$method), meta$method, ""),
+      `Sex` = "Unrecorded",
+      `Life stage` = ifelse(!is.null(meta$stage), meta$stage, "Adult"),
+      `Record status` = "",
+      `Confidential` = "No",
+      `Comment (255)` = str_trunc(Comment, 255)
+    )
+  
+  apply_factor_dropdowns(df, lookups)
+}
+
 # ==============================================================================
 # 2. UI DESIGN
 # ==============================================================================
@@ -354,7 +386,7 @@ ui <- page_navbar(
     )
   ),
   
-  # --- TAB 4: ADMIN & DATABASE (Natural vertical scrolling enabled) ---
+  # --- TAB 4: ADMIN & DATABASE ---
   nav_panel(
     title = "4. Admin & Database",
     value = "tab_admin",
@@ -419,17 +451,19 @@ server <- function(input, output, session) {
   active_temp_file <- reactiveVal(NULL)
   admin_unlocked <- reactiveVal(FALSE)
   
+  # Reactive values for temp file previewing in Tab 4
+  preview_temp_payload <- reactiveVal(NULL)
+  preview_temp_filename <- reactiveVal(NULL)
+  
   export_data_val <- reactiveVal(data.frame())
   master_data_val <- reactiveVal(data.frame())
   
-  # Unique timestamped filepath generator
   get_temp_filepath <- function(site, date_str) {
     clean_site <- gsub("[^A-Za-z0-9]", "_", site)
     timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
     file.path(TEMP_DIR, paste0("temp_", clean_site, "_", date_str, "_", timestamp, ".rds"))
   }
   
-  # Dynamic species calculation for Tab 2 dropdown based on current site & last 30 days
   sorted_species_df <- reactive({
     sp <- species_df()
     master <- master_data_val()
@@ -464,7 +498,6 @@ server <- function(input, output, session) {
       arrange(desc(RecentFreq), Taxon)
   })
   
-  # Stepper counter actions
   observeEvent(input$plus_one, {
     current <- ifelse(is.na(input$count), 0, input$count)
     updateNumericInput(session, "count", value = current + 1)
@@ -475,7 +508,6 @@ server <- function(input, output, session) {
     updateNumericInput(session, "count", value = max(1, current - 1))
   })
   
-  # Recovery Trigger Modal
   observeEvent(input$recover_btn, {
     temp_files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$")
     
@@ -510,14 +542,12 @@ server <- function(input, output, session) {
     if (file.exists(filepath)) {
       restored_obj <- readRDS(filepath)
       
-      # Extract counts table & metadata (backward compatible with old dataframe-only files)
       if (is.data.frame(restored_obj)) {
         session_counts(restored_obj)
       } else {
         session_counts(restored_obj$counts)
         meta <- restored_obj$metadata
         
-        # Restore Site Selection
         if (!is.null(meta$site)) {
           st <- sites_df()
           if (meta$site %in% st$Site) {
@@ -531,14 +561,12 @@ server <- function(input, output, session) {
           }
         }
         
-        # Restore Date & Other Session Metadata
         if (!is.null(meta$date)) updateDateInput(session, "rec_date", value = as.Date(meta$date))
         if (!is.null(meta$observer)) updateTextInput(session, "observer", value = meta$observer)
         if (!is.null(meta$method)) updateSelectInput(session, "sampling_method", selected = meta$method)
         if (!is.null(meta$stage)) updateSelectInput(session, "life_stage", selected = meta$stage)
       }
       
-      # Delete restored temp file from disk upon recovery
       tryCatch({ file.remove(filepath) }, error = function(e) NULL)
       active_temp_file(NULL)
       
@@ -548,11 +576,9 @@ server <- function(input, output, session) {
     }
   })
   
-  # Stitch Temporary Files Action (Excludes working/latest file of current site, deletes stitched files)
   observeEvent(input$btn_stitch_temp, {
     temp_files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = FALSE)
     
-    # Identify active working file & latest temp file for current site
     active_fname <- if (!is.null(active_temp_file())) basename(active_temp_file()) else NULL
     
     site_name <- tryCatch(current_site_info()$Site, error = function(e) "")
@@ -607,7 +633,6 @@ server <- function(input, output, session) {
         obj <- readRDS(fpath)
         tdf <- if (is.data.frame(obj)) obj else obj$counts
         stitched_dfs[[length(stitched_dfs) + 1]] <- tdf
-        # Delete stitched temporary file from disk
         tryCatch({ file.remove(fpath) }, error = function(e) NULL)
       }
     }
@@ -676,7 +701,6 @@ server <- function(input, output, session) {
     master_data_val(load_master_df())
   })
   
-  # Render Tab 2 Species Dropdown with dynamically sorted species
   observe({
     sp <- sorted_species_df()
     req(nrow(sp) > 0)
@@ -798,7 +822,6 @@ server <- function(input, output, session) {
         active_temp_file(get_temp_filepath(site_info$Site, date_str))
       }
       
-      # Package count table + metadata together for backup
       save_payload <- list(
         counts = updated,
         metadata = list(
@@ -882,7 +905,6 @@ server <- function(input, output, session) {
     export_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
-  # Delete Selected Row in Review & Export Tab
   observeEvent(input$btn_delete_review_row, {
     selected_rows <- input$review_export_table_rows_selected
     if (is.null(selected_rows) || length(selected_rows) == 0) {
@@ -914,7 +936,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Append to Master
   observeEvent(input$btn_save_master, {
     out_df <- export_data_val()
     req(nrow(out_df) > 0)
@@ -953,7 +974,7 @@ server <- function(input, output, session) {
   )
   
   # ==============================================================================
-  # 4. TAB 4: PUBLIC MASTER PREVIEW & ADMIN PANEL
+  # 4. TAB 4: PUBLIC MASTER PREVIEW, EDITING & BULK UPDATE
   # ==============================================================================
   
   observeEvent(input$btn_admin_login, {
@@ -988,7 +1009,7 @@ server <- function(input, output, session) {
           )
         ),
         p(class = "text-muted small ms-3 mt-2", 
-          if (is_admin) "Double-click cells to edit. Select rows and click delete to remove master records." 
+          if (is_admin) "Double-click cells to edit inline. Select multiple rows to bulk update fields or delete." 
           else "Anyone can view master records. Enter admin password below to enable record editing and file cleanup."
         ),
         div(style = "overflow-x: auto; padding: 0 1rem;", DTOutput("master_records_table")),
@@ -997,7 +1018,8 @@ server <- function(input, output, session) {
             div(
               class = "d-flex gap-2 flex-wrap align-items-center",
               actionButton("btn_save_master_edits", "Save Master Edits", class = "btn-success"),
-              actionButton("btn_delete_master_row", "Delete Selected Master Row(s)", class = "btn-danger"),
+              actionButton("btn_bulk_edit_master", "Bulk Edit Selected Rows", class = "btn-warning"),
+              actionButton("btn_delete_master_row", "Delete Selected Row(s)", class = "btn-danger"),
               actionButton("btn_admin_lock", "Lock Admin", class = "btn-outline-secondary"),
               downloadButton("btn_download_master_csv", "Download Master CSV", class = "btn-outline-primary ms-auto")
             )
@@ -1017,82 +1039,18 @@ server <- function(input, output, session) {
           fill = FALSE,
           class = "mb-4",
           card_header("Temporary Files Cleanup Manager"),
-          p(class = "text-muted small ms-3 mt-2", "Manage or clean up leftover temporary backup working files from the server."),
+          p(class = "text-muted small ms-3 mt-2", "Select a temporary backup file to preview, edit in session, append to master, or delete."),
           div(style = "overflow-x: auto; padding: 0 1rem;", DTOutput("admin_temp_files_table")),
           card_footer(
-            actionButton("btn_delete_temp_files", "Delete Selected Temp File(s)", class = "btn-danger")
+            div(
+              class = "d-flex gap-2 flex-wrap",
+              actionButton("btn_preview_temp_file", "Preview Selected Temp File", class = "btn-info"),
+              actionButton("btn_delete_temp_files", "Delete Selected Temp File(s)", class = "btn-danger")
+            )
           )
         )
       }
     )
-  })
-  
-  output$admin_temp_files_table <- renderDT({
-    req(admin_unlocked())
-    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
-    
-    if (length(files) == 0) {
-      df <- data.frame(Filename = character(), Size_KB = numeric(), Last_Modified = character())
-    } else {
-      info <- file.info(files)
-      df <- data.frame(
-        Filename = basename(files),
-        Size_KB = round(info$size / 1024, 2),
-        Last_Modified = format(info$mtime, "%Y-%m-%d %H:%M:%S"),
-        stringsAsFactors = FALSE
-      )
-    }
-    
-    datatable(
-      df, 
-      rownames = FALSE, 
-      selection = "multiple", 
-      options = list(
-        pageLength = 10, 
-        scrollX = TRUE, 
-        autoWidth = TRUE,
-        dom = 'fltip'
-      )
-    )
-  })
-  
-  observeEvent(input$btn_delete_temp_files, {
-    req(admin_unlocked())
-    selected_rows <- input$admin_temp_files_table_rows_selected
-    
-    if (is.null(selected_rows) || length(selected_rows) == 0) {
-      showNotification("Please select temporary files to delete.", type = "warning")
-      return()
-    }
-    
-    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
-    files_to_del <- files[selected_rows]
-    
-    file.remove(files_to_del)
-    showNotification("Selected temporary backup files removed.", type = "message")
-  })
-  
-  observeEvent(input$master_records_table_cell_edit, {
-    req(admin_unlocked())
-    info <- input$master_records_table_cell_edit
-    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
-    updated_df <- DT::editData(current_df, info, rownames = FALSE)
-    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
-  })
-  
-  observeEvent(input$btn_delete_master_row, {
-    req(admin_unlocked())
-    selected_rows <- input$master_records_table_rows_selected
-    
-    if (is.null(selected_rows) || length(selected_rows) == 0) {
-      showNotification("Please select row(s) in the Master Database table to delete.", type = "warning")
-      return()
-    }
-    
-    current_df <- master_data_val()
-    updated_df <- current_df[-selected_rows, , drop = FALSE]
-    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
-    showNotification("Selected row(s) removed. Click 'Save Master Edits' to apply changes to disk.", type = "message")
   })
   
   output$master_records_table <- renderDT({
@@ -1107,10 +1065,127 @@ server <- function(input, output, session) {
       options = list(
         pageLength = 15,
         scrollX = TRUE,
+        stateSave = TRUE,
         dom = 'fltip',
         ordering = FALSE
       )
     )
+  })
+  
+  observeEvent(input$master_records_table_cell_edit, {
+    req(admin_unlocked())
+    info <- input$master_records_table_cell_edit
+    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
+    updated_df <- DT::editData(current_df, info, rownames = FALSE)
+    formatted_df <- apply_factor_dropdowns(updated_df, lookups_data())
+    
+    master_data_val(formatted_df)
+    replaceData(dataTableProxy("master_records_table"), formatted_df, resetPaging = FALSE)
+  })
+  
+  observeEvent(input$btn_bulk_edit_master, {
+    req(admin_unlocked())
+    selected_rows <- input$master_records_table_rows_selected
+    
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select one or more rows in the table to perform a bulk edit.", type = "warning")
+      return()
+    }
+    
+    showModal(modalDialog(
+      title = paste("Bulk Edit", length(selected_rows), "Selected Record(s)"),
+      size = "m",
+      selectInput("bulk_col_select", "Select Column to Update:", choices = BC_COLUMNS, selected = "Location (64)"),
+      uiOutput("bulk_val_input_ui"),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_bulk_edit", "Apply Bulk Update", class = "btn-primary")
+      )
+    ))
+  })
+  
+  output$bulk_val_input_ui <- renderUI({
+    req(input$bulk_col_select)
+    col <- input$bulk_col_select
+    lk <- lookups_data()
+    st <- sites_df()
+    
+    if (col == "Location (64)") {
+      selectInput("bulk_val_input", "New Location Value:", choices = unique(st$Site))
+    } else if (col == "Vice-county") {
+      selectInput("bulk_val_input", "New Vice-county Value:", choices = lk$vice_counties)
+    } else if (col == "Sampling method") {
+      selectInput("bulk_val_input", "New Sampling Method:", choices = lk$methods)
+    } else if (col == "Sex") {
+      selectInput("bulk_val_input", "New Sex Value:", choices = lk$sex)
+    } else if (col == "Life stage") {
+      selectInput("bulk_val_input", "New Life Stage Value:", choices = lk$stage)
+    } else if (col == "Record status") {
+      selectInput("bulk_val_input", "New Record Status:", choices = lk$status)
+    } else if (col == "Confidential") {
+      selectInput("bulk_val_input", "Confidential Flag:", choices = c("No", "Yes"))
+    } else if (col == "Abundance qualifier") {
+      selectInput("bulk_val_input", "Qualifier:", choices = c("Exact", "Estimate"))
+    } else if (col == "Date (10)") {
+      dateInput("bulk_val_input_date", "New Date:", value = Sys.Date()-1, format = "dd/mm/yyyy")
+    } else {
+      textInput("bulk_val_input", "New Text Value:", placeholder = "Enter new value for selected rows...")
+    }
+  })
+  
+  observeEvent(input$confirm_bulk_edit, {
+    req(admin_unlocked(), input$bulk_col_select)
+    selected_rows <- input$master_records_table_rows_selected
+    col_name <- input$bulk_col_select
+    
+    new_value <- if (col_name == "Date (10)") {
+      format(input$bulk_val_input_date, "%d/%m/%Y")
+    } else {
+      input$bulk_val_input
+    }
+    
+    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
+    current_df[selected_rows, col_name] <- new_value
+    
+    formatted_df <- apply_factor_dropdowns(current_df, lookups_data())
+    master_data_val(formatted_df)
+    
+    replaceData(dataTableProxy("master_records_table"), formatted_df, resetPaging = FALSE)
+    
+    if (col_name == "Location (64)" && new_value %in% sites_df()$Site) {
+      site_info <- sites_df() %>% filter(Site == new_value) %>% slice(1)
+      if (nrow(site_info) > 0) {
+        current_df[selected_rows, "Grid reference (12)"] <- site_info$GridRef
+        current_df[selected_rows, "Vice-county"] <- site_info$ViceCounty
+        formatted_df <- apply_factor_dropdowns(current_df, lookups_data())
+        master_data_val(formatted_df)
+        replaceData(dataTableProxy("master_records_table"), formatted_df, resetPaging = FALSE)
+      }
+    }
+    
+    removeModal()
+    showNotification(
+      sprintf("Updated '%s' for %d row(s). Click 'Save Master Edits' to write changes to disk.", col_name, length(selected_rows)), 
+      type = "message"
+    )
+  })
+  
+  observeEvent(input$btn_delete_master_row, {
+    req(admin_unlocked())
+    selected_rows <- input$master_records_table_rows_selected
+    
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select row(s) in the Master Database table to delete.", type = "warning")
+      return()
+    }
+    
+    current_df <- master_data_val()
+    updated_df <- current_df[-selected_rows, , drop = FALSE]
+    formatted_df <- apply_factor_dropdowns(updated_df, lookups_data())
+    
+    master_data_val(formatted_df)
+    replaceData(dataTableProxy("master_records_table"), formatted_df, resetPaging = FALSE)
+    showNotification("Selected row(s) removed. Click 'Save Master Edits' to apply changes to disk.", type = "message", duration = 4)
   })
   
   observeEvent(input$btn_save_master_edits, {
@@ -1132,6 +1207,184 @@ server <- function(input, output, session) {
       write_csv(df, file) 
     }
   )
+  
+  output$admin_temp_files_table <- renderDT({
+    req(admin_unlocked())
+    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
+    
+    if (length(files) == 0) {
+      df <- data.frame(Filename = character(), Size_KB = numeric(), Last_Modified = character())
+    } else {
+      info <- file.info(files)
+      df <- data.frame(
+        Filename = basename(files),
+        Size_KB = round(info$size / 1024, 2),
+        Last_Modified = format(info$mtime, "%Y-%m-%d %H:%M:%S"),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    datatable(
+      df, 
+      rownames = FALSE, 
+      selection = "single", 
+      options = list(
+        pageLength = 10, 
+        scrollX = TRUE, 
+        autoWidth = TRUE,
+        dom = 'fltip'
+      )
+    )
+  })
+  
+  # --- TEMP FILE PREVIEW & ACTIONS ---
+  observeEvent(input$btn_preview_temp_file, {
+    req(admin_unlocked())
+    selected_row <- input$admin_temp_files_table_rows_selected
+    
+    if (is.null(selected_row) || length(selected_row) == 0) {
+      showNotification("Please select a temporary file from the table to preview.", type = "warning")
+      return()
+    }
+    
+    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
+    fname <- basename(files[selected_row])
+    fpath <- files[selected_row]
+    
+    if (!file.exists(fpath)) {
+      showNotification("Selected file no longer exists.", type = "error")
+      return()
+    }
+    
+    obj <- readRDS(fpath)
+    preview_temp_filename(fname)
+    preview_temp_payload(obj)
+    
+    counts_df <- if (is.data.frame(obj)) obj else obj$counts
+    meta <- if (is.data.frame(obj)) list(site = "Unknown", date = Sys.Date()-1) else obj$metadata
+    
+    sp_ref <- species_df()
+    formatted_preview <- format_temp_payload(counts_df, meta, sp_ref, lookups_data())
+    
+    meta_html <- sprintf(
+      "<strong>Site:</strong> %s | <strong>Date:</strong> %s | <strong>Observer:</strong> %s | <strong>Method:</strong> %s",
+      ifelse(!is.null(meta$site), meta$site, "N/A"),
+      ifelse(!is.null(meta$date), format(as.Date(meta$date), "%d/%m/%Y"), "N/A"),
+      ifelse(!is.null(meta$observer), meta$observer, "N/A"),
+      ifelse(!is.null(meta$method), meta$method, "N/A")
+    )
+    
+    showModal(modalDialog(
+      title = paste("Preview Temp File:", fname),
+      size = "l",
+      div(class = "alert alert-info mb-3", HTML(meta_html)),
+      div(style = "overflow-x: auto;", renderDT({
+        datatable(formatted_preview, rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE, dom = 't'))
+      })),
+      footer = tagList(
+        actionButton("btn_temp_action_edit", "Load into Session to Edit", class = "btn-warning"),
+        actionButton("btn_temp_action_append", "Append Direct to Master", class = "btn-success"),
+        actionButton("btn_temp_action_delete", "Delete File", class = "btn-danger"),
+        modalButton("Close")
+      )
+    ))
+  })
+  
+  # Option 1: Load previewed temp file into Active Session to Edit
+  observeEvent(input$btn_temp_action_edit, {
+    obj <- preview_temp_payload()
+    fname <- preview_temp_filename()
+    req(obj, fname)
+    
+    fpath <- file.path(TEMP_DIR, fname)
+    
+    if (is.data.frame(obj)) {
+      session_counts(obj)
+    } else {
+      session_counts(obj$counts)
+      meta <- obj$metadata
+      
+      if (!is.null(meta$site)) {
+        st <- sites_df()
+        if (meta$site %in% st$Site) {
+          updateSelectInput(session, "site_select", selected = meta$site)
+          updateCheckboxInput(session, "is_new_site", value = FALSE)
+        } else {
+          updateCheckboxInput(session, "is_new_site", value = TRUE)
+          updateTextInput(session, "new_site_name", value = meta$site)
+          if (!is.null(meta$grid_ref)) updateTextInput(session, "new_grid_ref", value = meta$grid_ref)
+          if (!is.null(meta$vice_county)) updateSelectInput(session, "new_vc", selected = meta$vice_county)
+        }
+      }
+      
+      if (!is.null(meta$date)) updateDateInput(session, "rec_date", value = as.Date(meta$date))
+      if (!is.null(meta$observer)) updateTextInput(session, "observer", value = meta$observer)
+      if (!is.null(meta$method)) updateSelectInput(session, "sampling_method", selected = meta$method)
+      if (!is.null(meta$stage)) updateSelectInput(session, "life_stage", selected = meta$stage)
+    }
+    
+    active_temp_file(fpath)
+    removeModal()
+    showNotification("Temp file loaded into active session! Redirecting to Export/Edit view...", type = "message")
+    nav_select("main_nav", "tab_export")
+  })
+  
+  # Option 2: Append previewed temp file directly to Master CSV
+  observeEvent(input$btn_temp_action_append, {
+    obj <- preview_temp_payload()
+    fname <- preview_temp_filename()
+    req(obj, fname)
+    
+    fpath <- file.path(TEMP_DIR, fname)
+    counts_df <- if (is.data.frame(obj)) obj else obj$counts
+    meta <- if (is.data.frame(obj)) list(site = "Unknown", date = Sys.Date()-1) else obj$metadata
+    
+    formatted_df <- format_temp_payload(counts_df, meta, species_df(), lookups_data())
+    formatted_df <- formatted_df %>% mutate(across(where(is.factor), as.character))
+    
+    write_csv(formatted_df, RECORDS_FILE, append = TRUE)
+    
+    if (file.exists(fpath)) {
+      tryCatch({ file.remove(fpath) }, error = function(e) NULL)
+    }
+    
+    master_data_val(load_master_df())
+    species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
+    
+    removeModal()
+    showNotification(paste(fname, "appended to Master CSV and removed from server."), type = "message", duration = 5)
+  })
+  
+  # Option 3: Delete previewed temp file
+  observeEvent(input$btn_temp_action_delete, {
+    fname <- preview_temp_filename()
+    req(fname)
+    
+    fpath <- file.path(TEMP_DIR, fname)
+    if (file.exists(fpath)) {
+      file.remove(fpath)
+    }
+    
+    removeModal()
+    showNotification(paste(fname, "deleted."), type = "message")
+  })
+  
+  # Batch Delete Temp Files
+  observeEvent(input$btn_delete_temp_files, {
+    req(admin_unlocked())
+    selected_rows <- input$admin_temp_files_table_rows_selected
+    
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select temporary files to delete.", type = "warning")
+      return()
+    }
+    
+    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
+    files_to_del <- files[selected_rows]
+    
+    file.remove(files_to_del)
+    showNotification("Selected temporary backup files removed.", type = "message")
+  })
   
   # ==============================================================================
   # 5. TAB 5: VISUALISATION LOGIC
