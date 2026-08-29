@@ -12,11 +12,10 @@ library(ggplot2)
 # ==============================================================================
 
 SITES_FILE <- "sites.csv"
-RECORDS_FILE <- "master_moth_records.csv"
+RECORDS_FILE <- if (dir.exists("/srv/data/MothRecorder")) "/srv/data/MothRecorder/master_moth_records.csv"  else "master_moth_records.csv"  # must be used on server
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
-# Configure server backup directory with local fallback
 TEMP_DIR <- if (dir.exists("/srv/data/MothRecorder")) "/srv/data/MothRecorder" else "temp_saves"
 if (!dir.exists(TEMP_DIR)) {
   dir.create(TEMP_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -168,24 +167,6 @@ load_and_clean_species <- function(file_path, records_file = RECORDS_FILE) {
     out$Shortcut[i] <- paste(unique(existing_keys), collapse = ", ")
   }
   
-  rec_counts <- data.frame(Taxon = character(), RecFreq = integer(), stringsAsFactors = FALSE)
-  if (file.exists(records_file)) {
-    rec_df <- tryCatch(read_csv(records_file, show_col_types = FALSE, col_types = cols(.default = "c")), error = function(e) NULL)
-    if (!is.null(rec_df) && nrow(rec_df) > 0 && "Taxon" %in% colnames(rec_df)) {
-      rec_counts <- rec_df %>%
-        mutate(Taxon = iconv(Taxon, to = "UTF-8", sub = "")) %>%
-        filter(!is.na(Taxon) & nchar(trimws(Taxon)) > 0) %>%
-        group_by(Taxon = trimws(Taxon)) %>%
-        summarize(RecFreq = n(), .groups = "drop")
-    }
-  }
-  
-  out <- out %>%
-    left_join(rec_counts, by = "Taxon") %>%
-    mutate(RecFreq = ifelse(is.na(RecFreq), 0, RecFreq)) %>%
-    arrange(desc(RecFreq), Taxon) %>%
-    select(-RecFreq)
-  
   return(out)
 }
 
@@ -245,7 +226,6 @@ ui <- page_navbar(
       background-color: #e2e8f0 !important;
     }
     
-    /* Stepper container styling */
     .stepper-container {
       display: flex;
       align-items: center;
@@ -360,28 +340,29 @@ ui <- page_navbar(
     card(
       card_header("Review & Edit Active Session Output"),
       htmlOutput("session_summary_banner"),
-      p(class = "text-muted small", "Double-click cells to edit. Dropdowns are available for Sex, Life stage, Record status, Abundance qualifier, and Confidential."),
+      p(class = "text-muted small", "Double-click cells to edit. Select a row and click 'Delete Selected Row' to remove entries."),
       div(style = "overflow-x: auto;", DTOutput("review_export_table")),
       card_footer(
-        actionButton("btn_save_master", "Append to Master CSV", class = "btn-primary"),
-        downloadButton("btn_download_csv", "Download Session CSV", class = "btn-outline-success")
+        div(
+          class = "d-flex gap-2 flex-wrap",
+          actionButton("btn_save_master", "Append to Master CSV", class = "btn-primary"),
+          downloadButton("btn_download_csv", "Download Session CSV", class = "btn-outline-success"),
+          actionButton("btn_delete_review_row", "Delete Selected Row(s)", class = "btn-danger"),
+          actionButton("btn_stitch_temp", "Stitch Temporary Files", class = "btn-warning ms-auto")
+        )
       )
     )
   ),
   
-  # --- TAB 4: MASTER DATABASE ---
+  # --- TAB 4: ADMIN & DATABASE (Natural vertical scrolling enabled) ---
   nav_panel(
-    title = "4. Master Database",
-    value = "tab_master",
-    icon = icon("database"),
-    card(
-      card_header("Master Records Database (master_moth_records.csv)"),
-      p(class = "text-muted small", "View, edit, or download all records saved in master_moth_records.csv."),
-      div(style = "overflow-x: auto;", DTOutput("master_records_table")),
-      card_footer(
-        actionButton("btn_save_master_edits", "Save Master Edits", class = "btn-success"),
-        downloadButton("btn_download_master_csv", "Download Master CSV", class = "btn-outline-primary")
-      )
+    title = "4. Admin & Database",
+    value = "tab_admin",
+    icon = icon("user-shield"),
+    fillable = FALSE,
+    div(
+      style = "padding-bottom: 4rem;",
+      uiOutput("admin_panel_ui")
     )
   ),
   
@@ -435,19 +416,55 @@ server <- function(input, output, session) {
     stringsAsFactors = FALSE
   ))
   
-  # Tracks active temp file path to ensure precise cleanup on append
   active_temp_file <- reactiveVal(NULL)
+  admin_unlocked <- reactiveVal(FALSE)
   
   export_data_val <- reactiveVal(data.frame())
   master_data_val <- reactiveVal(data.frame())
   
-  # Helper function for temporary backup file naming
+  # Unique timestamped filepath generator
   get_temp_filepath <- function(site, date_str) {
     clean_site <- gsub("[^A-Za-z0-9]", "_", site)
-    file.path(TEMP_DIR, paste0("temp_", clean_site, "_", date_str, ".rds"))
+    timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+    file.path(TEMP_DIR, paste0("temp_", clean_site, "_", date_str, "_", timestamp, ".rds"))
   }
   
-  # Increment/Decrement count buttons
+  # Dynamic species calculation for Tab 2 dropdown based on current site & last 30 days
+  sorted_species_df <- reactive({
+    sp <- species_df()
+    master <- master_data_val()
+    
+    site_name <- tryCatch(current_site_info()$Site, error = function(e) NULL)
+    trap_date <- input$rec_date
+    
+    if (is.null(site_name) || nchar(site_name) == 0 || is.null(trap_date) || nrow(master) == 0) {
+      return(sp)
+    }
+    
+    date_start <- trap_date - 30
+    
+    recent_site_counts <- master %>%
+      mutate(
+        Taxon_clean = trimws(iconv(Taxon, to = "UTF-8", sub = "")),
+        Location_clean = trimws(iconv(`Location (64)`, to = "UTF-8", sub = "")),
+        Parsed_Date = as.Date(`Date (10)`, format = "%d/%m/%Y")
+      ) %>%
+      filter(
+        Location_clean == trimws(site_name),
+        !is.na(Parsed_Date),
+        Parsed_Date >= date_start,
+        Parsed_Date <= trap_date
+      ) %>%
+      group_by(Taxon = Taxon_clean) %>%
+      summarize(RecentFreq = n(), .groups = "drop")
+    
+    sp %>%
+      left_join(recent_site_counts, by = "Taxon") %>%
+      mutate(RecentFreq = ifelse(is.na(RecentFreq), 0, RecentFreq)) %>%
+      arrange(desc(RecentFreq), Taxon)
+  })
+  
+  # Stepper counter actions
   observeEvent(input$plus_one, {
     current <- ifelse(is.na(input$count), 0, input$count)
     updateNumericInput(session, "count", value = current + 1)
@@ -458,8 +475,7 @@ server <- function(input, output, session) {
     updateNumericInput(session, "count", value = max(1, current - 1))
   })
   
-  # Session Recovery Modal Trigger
-  # Session Recovery Modal Trigger
+  # Recovery Trigger Modal
   observeEvent(input$recover_btn, {
     temp_files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$")
     
@@ -472,12 +488,12 @@ server <- function(input, output, session) {
     } else {
       showModal(modalDialog(
         title = "Recover Lost Session",
-        size = "l", # Expands modal container width
+        size = "l",
         selectInput(
           "selected_recovery_file", 
           "Select your Site & Date session backup:", 
           choices = temp_files,
-          width = "100%" # Forces select box to fill 100% of the expanded modal width
+          width = "100%"
         ),
         footer = tagList(
           modalButton("Cancel"),
@@ -487,22 +503,128 @@ server <- function(input, output, session) {
     }
   })
   
-  # Session Data Restore Action
   observeEvent(input$confirm_recovery, {
     req(input$selected_recovery_file)
     filepath <- file.path(TEMP_DIR, input$selected_recovery_file)
     
     if (file.exists(filepath)) {
-      restored_data <- readRDS(filepath)
-      session_counts(restored_data)
-      active_temp_file(filepath) # Track restored file for post-append deletion
+      restored_obj <- readRDS(filepath)
+      
+      # Extract counts table & metadata (backward compatible with old dataframe-only files)
+      if (is.data.frame(restored_obj)) {
+        session_counts(restored_obj)
+      } else {
+        session_counts(restored_obj$counts)
+        meta <- restored_obj$metadata
+        
+        # Restore Site Selection
+        if (!is.null(meta$site)) {
+          st <- sites_df()
+          if (meta$site %in% st$Site) {
+            updateSelectInput(session, "site_select", selected = meta$site)
+            updateCheckboxInput(session, "is_new_site", value = FALSE)
+          } else {
+            updateCheckboxInput(session, "is_new_site", value = TRUE)
+            updateTextInput(session, "new_site_name", value = meta$site)
+            if (!is.null(meta$grid_ref)) updateTextInput(session, "new_grid_ref", value = meta$grid_ref)
+            if (!is.null(meta$vice_county)) updateSelectInput(session, "new_vc", selected = meta$vice_county)
+          }
+        }
+        
+        # Restore Date & Other Session Metadata
+        if (!is.null(meta$date)) updateDateInput(session, "rec_date", value = as.Date(meta$date))
+        if (!is.null(meta$observer)) updateTextInput(session, "observer", value = meta$observer)
+        if (!is.null(meta$method)) updateSelectInput(session, "sampling_method", selected = meta$method)
+        if (!is.null(meta$stage)) updateSelectInput(session, "life_stage", selected = meta$stage)
+      }
+      
+      # Delete restored temp file from disk upon recovery
+      tryCatch({ file.remove(filepath) }, error = function(e) NULL)
+      active_temp_file(NULL)
+      
       removeModal()
-      showNotification("Session tally successfully restored!", type = "message")
+      showNotification("Session tally and site/date metadata successfully restored!", type = "message")
       nav_select("main_nav", "tab_counter")
     }
   })
   
-  # Session Summary Banner
+  # Stitch Temporary Files Action (Excludes working/latest file of current site, deletes stitched files)
+  observeEvent(input$btn_stitch_temp, {
+    temp_files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = FALSE)
+    
+    # Identify active working file & latest temp file for current site
+    active_fname <- if (!is.null(active_temp_file())) basename(active_temp_file()) else NULL
+    
+    site_name <- tryCatch(current_site_info()$Site, error = function(e) "")
+    clean_site <- gsub("[^A-Za-z0-9]", "_", site_name)
+    site_temp_files <- temp_files[grepl(paste0("^temp_", clean_site, "_"), temp_files)]
+    
+    most_recent_site_file <- NULL
+    if (length(site_temp_files) > 0) {
+      file_paths <- file.path(TEMP_DIR, site_temp_files)
+      mtimes <- file.info(file_paths)$mtime
+      most_recent_site_file <- site_temp_files[which.max(mtimes)]
+    }
+    
+    exclude_files <- unique(c(active_fname, most_recent_site_file))
+    available_files <- setdiff(temp_files, exclude_files)
+    
+    if (length(available_files) == 0) {
+      showModal(modalDialog(
+        title = "No Available Temporary Files",
+        "No prior temporary files were found to stitch (the active working session file is excluded).",
+        easyClose = TRUE
+      ))
+    } else {
+      showModal(modalDialog(
+        title = "Stitch Temporary Files",
+        size = "l",
+        p("Select one or more prior temporary session files to combine into the active session tally:"),
+        selectInput(
+          "stitch_files_select",
+          "Select Files to Combine:",
+          choices = available_files,
+          multiple = TRUE,
+          width = "100%"
+        ),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("confirm_stitch", "Combine & Delete Selected Files", class = "btn-primary")
+        )
+      ))
+    }
+  })
+  
+  observeEvent(input$confirm_stitch, {
+    req(input$stitch_files_select)
+    
+    current_df <- session_counts()
+    stitched_dfs <- list(current_df)
+    
+    for (fname in input$stitch_files_select) {
+      fpath <- file.path(TEMP_DIR, fname)
+      if (file.exists(fpath)) {
+        obj <- readRDS(fpath)
+        tdf <- if (is.data.frame(obj)) obj else obj$counts
+        stitched_dfs[[length(stitched_dfs) + 1]] <- tdf
+        # Delete stitched temporary file from disk
+        tryCatch({ file.remove(fpath) }, error = function(e) NULL)
+      }
+    }
+    
+    combined <- bind_rows(stitched_dfs) %>%
+      group_by(Taxon) %>%
+      summarize(
+        Count = sum(Count, na.rm = TRUE),
+        Comment = paste(unique(Comment[nchar(trimws(Comment)) > 0]), collapse = "; "),
+        .groups = "drop"
+      )
+    
+    session_counts(combined)
+    removeModal()
+    showNotification("Selected temporary files successfully stitched and removed from server!", type = "message")
+  })
+  
   output$session_summary_banner <- renderUI({
     counts <- session_counts()
     
@@ -517,7 +639,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Setup Dropdowns
   observe({
     lk <- lookups_data()
     updateSelectInput(session, "new_vc", choices = lk$vice_counties)
@@ -555,8 +676,9 @@ server <- function(input, output, session) {
     master_data_val(load_master_df())
   })
   
+  # Render Tab 2 Species Dropdown with dynamically sorted species
   observe({
-    sp <- species_df()
+    sp <- sorted_species_df()
     req(nrow(sp) > 0)
     
     sp_options <- lapply(seq_len(nrow(sp)), function(i) {
@@ -642,7 +764,6 @@ server <- function(input, output, session) {
     nav_select("main_nav", "tab_export")
   })
   
-  # ADD TO DAY COUNT ACTION WITH AUTO-SAVE BACKUP
   observeEvent(input$btn_add_count, {
     req(input$species_input, input$count)
     
@@ -669,13 +790,29 @@ server <- function(input, output, session) {
     
     session_counts(updated)
     
-    # Auto-save session state to temporary backup file and record path
     tryCatch({
-      site_name <- current_site_info()$Site
+      site_info <- current_site_info()
       date_str <- format(input$rec_date, "%Y%m%d")
-      filepath <- get_temp_filepath(site_name, date_str)
-      saveRDS(updated, file = filepath)
-      active_temp_file(filepath)
+      
+      if (is.null(active_temp_file())) {
+        active_temp_file(get_temp_filepath(site_info$Site, date_str))
+      }
+      
+      # Package count table + metadata together for backup
+      save_payload <- list(
+        counts = updated,
+        metadata = list(
+          site = site_info$Site,
+          grid_ref = site_info$GridRef,
+          vice_county = site_info$ViceCounty,
+          date = input$rec_date,
+          observer = input$observer,
+          method = input$sampling_method,
+          stage = input$life_stage
+        )
+      )
+      
+      saveRDS(save_payload, file = active_temp_file())
     }, error = function(e) {
       warning("Auto-save backup failed: ", e$message)
     })
@@ -731,8 +868,11 @@ server <- function(input, output, session) {
   })
   
   observeEvent(session_counts(), {
-    req(nrow(session_counts()) > 0)
-    export_data_val(formatted_export_data())
+    if (nrow(session_counts()) > 0) {
+      export_data_val(formatted_export_data())
+    } else {
+      export_data_val(data.frame())
+    }
   }, ignoreInit = TRUE)
   
   observeEvent(input$review_export_table_cell_edit, {
@@ -742,12 +882,29 @@ server <- function(input, output, session) {
     export_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
   })
   
+  # Delete Selected Row in Review & Export Tab
+  observeEvent(input$btn_delete_review_row, {
+    selected_rows <- input$review_export_table_rows_selected
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select a row to delete.", type = "warning")
+      return()
+    }
+    
+    current_export <- export_data_val()
+    deleted_taxons <- current_export$Taxon[selected_rows]
+    
+    updated_counts <- session_counts() %>% filter(!Taxon %in% deleted_taxons)
+    session_counts(updated_counts)
+    showNotification("Row deleted from session.", type = "message")
+  })
+  
   output$review_export_table <- renderDT({
     req(nrow(export_data_val()) > 0)
     datatable(
       export_data_val(),
       editable = TRUE,
       rownames = FALSE,
+      selection = "single",
       options = list(
         pageLength = 25,
         scrollX = TRUE,
@@ -757,29 +914,7 @@ server <- function(input, output, session) {
     )
   })
   
-  observeEvent(input$master_records_table_cell_edit, {
-    info <- input$master_records_table_cell_edit
-    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
-    updated_df <- DT::editData(current_df, info, rownames = FALSE)
-    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
-  })
-  
-  output$master_records_table <- renderDT({
-    req(nrow(master_data_val()) > 0)
-    datatable(
-      master_data_val(),
-      editable = TRUE,
-      rownames = FALSE,
-      options = list(
-        pageLength = 25,
-        scrollX = TRUE,
-        dom = 'fltip',
-        ordering = FALSE
-      )
-    )
-  })
-  
-  # APPEND TO MASTER & CLEAN UP BACKUP FILES
+  # Append to Master
   observeEvent(input$btn_save_master, {
     out_df <- export_data_val()
     req(nrow(out_df) > 0)
@@ -787,21 +922,10 @@ server <- function(input, output, session) {
     out_df <- out_df %>% mutate(across(where(is.factor), as.character))
     write_csv(out_df, RECORDS_FILE, append = TRUE)
     
-    # Clean up auto-save backup files after appending
     tryCatch({
-      # 1. Remove tracked active temp file if present
       if (!is.null(active_temp_file()) && file.exists(active_temp_file())) {
         file.remove(active_temp_file())
       }
-      
-      # 2. Check and remove any file matching current site/date metadata
-      site_name <- current_site_info()$Site
-      date_str <- format(input$rec_date, "%Y%m%d")
-      calc_filepath <- get_temp_filepath(site_name, date_str)
-      if (file.exists(calc_filepath)) {
-        file.remove(calc_filepath)
-      }
-      
       active_temp_file(NULL)
     }, error = function(e) NULL)
     
@@ -820,18 +944,6 @@ server <- function(input, output, session) {
     nav_select("main_nav", "tab_setup")
   })
   
-  observeEvent(input$btn_save_master_edits, {
-    out_df <- master_data_val()
-    req(nrow(out_df) > 0)
-    
-    out_df <- out_df %>% mutate(across(where(is.factor), as.character))
-    write_csv(out_df, RECORDS_FILE)
-    
-    species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
-    
-    showNotification("Master records spreadsheet updated successfully!", type = "message", duration = 5)
-  })
-  
   output$btn_download_csv <- downloadHandler(
     filename = function() { paste0("moth_records_", format(input$rec_date, "%Y%m%d"), ".csv") },
     content = function(file) { 
@@ -839,6 +951,179 @@ server <- function(input, output, session) {
       write_csv(df, file) 
     }
   )
+  
+  # ==============================================================================
+  # 4. TAB 4: PUBLIC MASTER PREVIEW & ADMIN PANEL
+  # ==============================================================================
+  
+  observeEvent(input$btn_admin_login, {
+    if (input$admin_pwd == "Moth Recorder Admin") {
+      admin_unlocked(TRUE)
+      showNotification("Admin panel unlocked. Full editing enabled.", type = "message")
+    } else {
+      showNotification("Incorrect admin password.", type = "error")
+    }
+  })
+  
+  observeEvent(input$btn_admin_lock, {
+    admin_unlocked(FALSE)
+    showNotification("Admin features locked.", type = "message")
+  })
+  
+  output$admin_panel_ui <- renderUI({
+    is_admin <- admin_unlocked()
+    
+    tagList(
+      card(
+        fill = FALSE,
+        class = "mb-4",
+        card_header(
+          div(
+            class = "d-flex justify-content-between align-items-center",
+            span("Master Database Records (master_moth_records.csv)"),
+            span(
+              class = if (is_admin) "badge bg-success" else "badge bg-secondary",
+              if (is_admin) "Admin Unlocked (Edit Mode)" else "Public View (Read Only)"
+            )
+          )
+        ),
+        p(class = "text-muted small ms-3 mt-2", 
+          if (is_admin) "Double-click cells to edit. Select rows and click delete to remove master records." 
+          else "Anyone can view master records. Enter admin password below to enable record editing and file cleanup."
+        ),
+        div(style = "overflow-x: auto; padding: 0 1rem;", DTOutput("master_records_table")),
+        card_footer(
+          if (is_admin) {
+            div(
+              class = "d-flex gap-2 flex-wrap align-items-center",
+              actionButton("btn_save_master_edits", "Save Master Edits", class = "btn-success"),
+              actionButton("btn_delete_master_row", "Delete Selected Master Row(s)", class = "btn-danger"),
+              actionButton("btn_admin_lock", "Lock Admin", class = "btn-outline-secondary"),
+              downloadButton("btn_download_master_csv", "Download Master CSV", class = "btn-outline-primary ms-auto")
+            )
+          } else {
+            div(
+              class = "d-flex gap-2 flex-wrap align-items-center",
+              div(style = "width: 250px;", passwordInput("admin_pwd", NULL, placeholder = "Admin Password")),
+              actionButton("btn_admin_login", "Unlock Admin Editing", class = "btn-primary"),
+              downloadButton("btn_download_master_csv", "Download Master CSV", class = "btn-outline-primary ms-auto")
+            )
+          }
+        )
+      ),
+      
+      if (is_admin) {
+        card(
+          fill = FALSE,
+          class = "mb-4",
+          card_header("Temporary Files Cleanup Manager"),
+          p(class = "text-muted small ms-3 mt-2", "Manage or clean up leftover temporary backup working files from the server."),
+          div(style = "overflow-x: auto; padding: 0 1rem;", DTOutput("admin_temp_files_table")),
+          card_footer(
+            actionButton("btn_delete_temp_files", "Delete Selected Temp File(s)", class = "btn-danger")
+          )
+        )
+      }
+    )
+  })
+  
+  output$admin_temp_files_table <- renderDT({
+    req(admin_unlocked())
+    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
+    
+    if (length(files) == 0) {
+      df <- data.frame(Filename = character(), Size_KB = numeric(), Last_Modified = character())
+    } else {
+      info <- file.info(files)
+      df <- data.frame(
+        Filename = basename(files),
+        Size_KB = round(info$size / 1024, 2),
+        Last_Modified = format(info$mtime, "%Y-%m-%d %H:%M:%S"),
+        stringsAsFactors = FALSE
+      )
+    }
+    
+    datatable(
+      df, 
+      rownames = FALSE, 
+      selection = "multiple", 
+      options = list(
+        pageLength = 10, 
+        scrollX = TRUE, 
+        autoWidth = TRUE,
+        dom = 'fltip'
+      )
+    )
+  })
+  
+  observeEvent(input$btn_delete_temp_files, {
+    req(admin_unlocked())
+    selected_rows <- input$admin_temp_files_table_rows_selected
+    
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select temporary files to delete.", type = "warning")
+      return()
+    }
+    
+    files <- list.files(TEMP_DIR, pattern = "^temp_.*\\.rds$", full.names = TRUE)
+    files_to_del <- files[selected_rows]
+    
+    file.remove(files_to_del)
+    showNotification("Selected temporary backup files removed.", type = "message")
+  })
+  
+  observeEvent(input$master_records_table_cell_edit, {
+    req(admin_unlocked())
+    info <- input$master_records_table_cell_edit
+    current_df <- master_data_val() %>% mutate(across(where(is.factor), as.character))
+    updated_df <- DT::editData(current_df, info, rownames = FALSE)
+    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
+  })
+  
+  observeEvent(input$btn_delete_master_row, {
+    req(admin_unlocked())
+    selected_rows <- input$master_records_table_rows_selected
+    
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      showNotification("Please select row(s) in the Master Database table to delete.", type = "warning")
+      return()
+    }
+    
+    current_df <- master_data_val()
+    updated_df <- current_df[-selected_rows, , drop = FALSE]
+    master_data_val(apply_factor_dropdowns(updated_df, lookups_data()))
+    showNotification("Selected row(s) removed. Click 'Save Master Edits' to apply changes to disk.", type = "message")
+  })
+  
+  output$master_records_table <- renderDT({
+    req(nrow(master_data_val()) > 0)
+    is_editable <- admin_unlocked()
+    
+    datatable(
+      master_data_val(),
+      editable = is_editable,
+      rownames = FALSE,
+      selection = if (is_editable) "multiple" else "none",
+      options = list(
+        pageLength = 15,
+        scrollX = TRUE,
+        dom = 'fltip',
+        ordering = FALSE
+      )
+    )
+  })
+  
+  observeEvent(input$btn_save_master_edits, {
+    req(admin_unlocked())
+    out_df <- master_data_val()
+    req(nrow(out_df) > 0)
+    
+    out_df <- out_df %>% mutate(across(where(is.factor), as.character))
+    write_csv(out_df, RECORDS_FILE)
+    
+    species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
+    showNotification("Master records spreadsheet updated successfully!", type = "message", duration = 5)
+  })
   
   output$btn_download_master_csv <- downloadHandler(
     filename = function() { paste0("master_moth_records_", format(Sys.Date(), "%Y%m%d"), ".csv") },
@@ -849,7 +1134,7 @@ server <- function(input, output, session) {
   )
   
   # ==============================================================================
-  # 4. TAB 5: VISUALISATION LOGIC
+  # 5. TAB 5: VISUALISATION LOGIC
   # ==============================================================================
   
   observe({
