@@ -1,3 +1,4 @@
+# last submitted version:
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -12,7 +13,7 @@ library(ggplot2)
 # ==============================================================================
 
 SITES_FILE <- "sites.csv"
-RECORDS_FILE <- if (dir.exists("/srv/data/MothRecorder")) "/srv/data/MothRecorder/master_moth_records.csv"  else "master_moth_records.csv"  # must be used on server
+RECORDS_FILE <- "master_moth_records.csv"
 SPECIES_FILE <- "MothSpecies.csv"
 LOOKUPS_FILE <- "Mothlookups.csv"
 
@@ -210,7 +211,6 @@ apply_factor_dropdowns <- function(df, lookups) {
   return(df)
 }
 
-# Helper to format RDS contents into Master structure
 format_temp_payload <- function(counts_df, meta, sp_ref, lookups) {
   date_val <- if (!is.null(meta$date)) format(as.Date(meta$date), "%d/%m/%Y") else format(Sys.Date()-1, "%d/%m/%Y")
   
@@ -451,7 +451,6 @@ server <- function(input, output, session) {
   active_temp_file <- reactiveVal(NULL)
   admin_unlocked <- reactiveVal(FALSE)
   
-  # Reactive values for temp file previewing in Tab 4
   preview_temp_payload <- reactiveVal(NULL)
   preview_temp_filename <- reactiveVal(NULL)
   
@@ -567,8 +566,8 @@ server <- function(input, output, session) {
         if (!is.null(meta$stage)) updateSelectInput(session, "life_stage", selected = meta$stage)
       }
       
-      tryCatch({ file.remove(filepath) }, error = function(e) NULL)
-      active_temp_file(NULL)
+      # Retain backup file as active so data is not lost if user disconnects again
+      active_temp_file(filepath)
       
       removeModal()
       showNotification("Session tally and site/date metadata successfully restored!", type = "message")
@@ -1290,7 +1289,6 @@ server <- function(input, output, session) {
     ))
   })
   
-  # Option 1: Load previewed temp file into Active Session to Edit
   observeEvent(input$btn_temp_action_edit, {
     obj <- preview_temp_payload()
     fname <- preview_temp_filename()
@@ -1329,7 +1327,6 @@ server <- function(input, output, session) {
     nav_select("main_nav", "tab_export")
   })
   
-  # Option 2: Append previewed temp file directly to Master CSV
   observeEvent(input$btn_temp_action_append, {
     obj <- preview_temp_payload()
     fname <- preview_temp_filename()
@@ -1355,7 +1352,6 @@ server <- function(input, output, session) {
     showNotification(paste(fname, "appended to Master CSV and removed from server."), type = "message", duration = 5)
   })
   
-  # Option 3: Delete previewed temp file
   observeEvent(input$btn_temp_action_delete, {
     fname <- preview_temp_filename()
     req(fname)
@@ -1369,7 +1365,6 @@ server <- function(input, output, session) {
     showNotification(paste(fname, "deleted."), type = "message")
   })
   
-  # Batch Delete Temp Files
   observeEvent(input$btn_delete_temp_files, {
     req(admin_unlocked())
     selected_rows <- input$admin_temp_files_table_rows_selected

@@ -11,15 +11,18 @@ library(ggplot2)
 # 1. FILE PATHS & DATA LOADERS
 # ==============================================================================
 
-SITES_FILE <- "sites.csv"
-RECORDS_FILE <- "master_moth_records.csv"
-SPECIES_FILE <- "MothSpecies.csv"
-LOOKUPS_FILE <- "Mothlookups.csv"
-
 TEMP_DIR <- if (dir.exists("/srv/data/MothRecorder")) "/srv/data/MothRecorder" else "temp_saves"
 if (!dir.exists(TEMP_DIR)) {
   dir.create(TEMP_DIR, recursive = TRUE, showWarnings = FALSE)
 }
+
+RECORDS_FILE <- file.path(TEMP_DIR, "master_moth_records.csv")
+#SITES_FILE   <- file.path(TEMP_DIR, "sites.csv")
+#SPECIES_FILE <- file.path(TEMP_DIR, "MothSpecies.csv")
+#LOOKUPS_FILE <- file.path(TEMP_DIR, "Mothlookups.csv")
+SITES_FILE   <- "sites.csv"
+SPECIES_FILE <- "MothSpecies.csv"
+LOOKUPS_FILE <- "Mothlookups.csv"
 
 load_lookups <- function(file_path) {
   defaults <- list(
@@ -245,12 +248,15 @@ format_temp_payload <- function(counts_df, meta, sp_ref, lookups) {
 # 2. UI DESIGN
 # ==============================================================================
 
+# ==============================================================================
+# 2. UI DESIGN
+# ==============================================================================
+
 ui <- page_navbar(
   title = "Field Moth Recorder",
   id = "main_nav",
   theme = bs_theme(version = 5, bootswatch = "flatly", primary = "#2c3e50"),
-  
-  tags$head(
+  header = tags$head(
     tags$style(HTML("
     #species-select-wrapper .selectize-dropdown .option.active,
     #species-select-wrapper .selectize-dropdown .active {
@@ -650,15 +656,146 @@ server <- function(input, output, session) {
   
   output$session_summary_banner <- renderUI({
     counts <- session_counts()
+    req(nrow(counts) > 0)
     
-    total_moths <- sum(counts$Count, na.rm = TRUE)
-    total_species <- length(unique(counts$Taxon[nchar(trimws(counts$Taxon)) > 0]))
+    sp_ref <- species_df()
+    site_info <- tryCatch(current_site_info(), error = function(e) NULL)
+    master <- master_data_val()
     
+    # 1. Join session counts with species reference data
+    counts_joined <- counts %>%
+      left_join(sp_ref, by = "Taxon") %>%
+      mutate(
+        Vernacular = ifelse(is.na(Vernacular) | Vernacular == "", Taxon, Vernacular)
+      )
+    
+    total_moths <- sum(counts_joined$Count, na.rm = TRUE)
+    total_species <- length(unique(counts_joined$Taxon[nchar(trimws(counts_joined$Taxon)) > 0]))
+    
+    # Base sentence
+    base_text <- sprintf("In this session you recorded <strong>%d moth%s</strong> of <strong>%d species</strong>.", 
+                         total_moths, ifelse(total_moths == 1, "", "s"), total_species)
+    
+    # 2. Most abundant species
+    top_sp <- counts_joined %>% arrange(desc(Count)) %>% slice(1)
+    abundant_text <- ""
+    if (nrow(top_sp) > 0) {
+      abundant_text <- sprintf("The most abundant species was <strong>%s</strong> (<em>%s</em>) with %d individual%s.",
+                               top_sp$Vernacular, top_sp$Taxon, top_sp$Count, ifelse(top_sp$Count == 1, "", "s"))
+    }
+    
+    # Helper to collapse list into natural English (A, B and C)
+    collapse_human <- function(vec) {
+      if (length(vec) == 0) return("")
+      if (length(vec) == 1) return(vec[1])
+      if (length(vec) == 2) return(paste(vec[1], "and", vec[2]))
+      paste(paste(vec[1:(length(vec)-1)], collapse = ", "), "and", vec[length(vec)])
+    }
+    
+    # Helper for ordinal record strings (0 past records -> 1st site record)
+    ordinal_str <- function(n_past) {
+      rec_num <- n_past + 1
+      if (rec_num %% 100 %in% c(11, 12, 13)) {
+        paste0(rec_num, "th")
+      } else {
+        switch(as.character(rec_num %% 10),
+               "1" = paste0(rec_num, "st"),
+               "2" = paste0(rec_num, "nd"),
+               "3" = paste0(rec_num, "rd"),
+               paste0(rec_num, "th"))
+      }
+    }
+    
+    # 3. Rarity & New Record Summary (Site specific, >= 3 prior visits required)
+    rarity_text <- ""
+    
+    if (!is.null(site_info) && nchar(site_info$Site) > 0 && nrow(master) > 0) {
+      site_master <- master %>%
+        filter(trimws(iconv(`Location (64)`, to = "UTF-8", sub = "")) == trimws(site_info$Site))
+      
+      # Calculate previous unique visits (dates) at this site
+      prev_visits <- site_master %>%
+        filter(!is.na(`Date (10)`), nchar(trimws(`Date (10)`)) > 0) %>%
+        pull(`Date (10)`) %>%
+        unique() %>%
+        length()
+      
+      if (prev_visits >= 3) {
+        # Count historical occurrences per species at this site
+        past_counts <- site_master %>%
+          group_by(Taxon = trimws(iconv(Taxon, to = "UTF-8", sub = ""))) %>%
+          summarize(PastRecords = n(), .groups = "drop")
+        
+        # Combine session records with past counts & filter for species with < 10 records
+        rare_candidates <- counts_joined %>%
+          left_join(past_counts, by = "Taxon") %>%
+          mutate(PastRecords = ifelse(is.na(PastRecords), 0, PastRecords)) %>%
+          filter(PastRecords < 10) %>%
+          arrange(PastRecords, Taxon)
+        
+        new_sp_df <- rare_candidates %>% filter(PastRecords == 0)
+        rare_sp_df <- rare_candidates %>% filter(PastRecords > 0)
+        
+        # Case A: One or more brand new site records exist
+        if (nrow(new_sp_df) > 0) {
+          new_fmt <- sapply(seq_len(nrow(new_sp_df)), function(i) {
+            sprintf("<strong>%s</strong> (<em>%s</em>)", new_sp_df$Vernacular[i], new_sp_df$Taxon[i])
+          })
+          
+          if (length(new_fmt) == 1) {
+            new_txt <- sprintf("%s was recorded for the first time at this site!", new_fmt[1])
+          } else {
+            new_txt <- sprintf("%s were recorded for the first time at this site!", collapse_human(new_fmt))
+          }
+          
+          # Mention up to 2 additional rare species if present
+          if (nrow(rare_sp_df) > 0) {
+            rare_to_show <- rare_sp_df[1:min(2, nrow(rare_sp_df)), ]
+            rare_fmt <- sapply(seq_len(nrow(rare_to_show)), function(i) {
+              sprintf("<strong>%s</strong> (<em>%s</em>) (%s site record)",
+                      rare_to_show$Vernacular[i], rare_to_show$Taxon[i], ordinal_str(rare_to_show$PastRecords[i]))
+            })
+            rare_txt <- sprintf("Additionally, %s %s notable.", 
+                                collapse_human(rare_fmt), 
+                                ifelse(length(rare_fmt) > 1, "were", "was"))
+            rarity_text <- paste(new_txt, rare_txt)
+          } else {
+            rarity_text <- new_txt
+          }
+          
+          # Case B: No new site records, but species with 1–9 past records exist
+        } else if (nrow(rare_sp_df) > 0) {
+          first_rare <- rare_sp_df[1, ]
+          lead_txt <- sprintf("Your most unusual capture was <strong>%s</strong> (<em>%s</em>), with %d previous record%s.",
+                              first_rare$Vernacular, first_rare$Taxon, first_rare$PastRecords,
+                              ifelse(first_rare$PastRecords == 1, "", "s"))
+          
+          if (nrow(rare_sp_df) > 1) {
+            other_rares <- rare_sp_df[2:min(3, nrow(rare_sp_df)), ]
+            other_fmt <- sapply(seq_len(nrow(other_rares)), function(i) {
+              sprintf("<strong>%s</strong> (<em>%s</em>) (%s site record)",
+                      other_rares$Vernacular[i], other_rares$Taxon[i], ordinal_str(other_rares$PastRecords[i]))
+            })
+            other_txt <- sprintf("while %s %s also notable.", 
+                                 collapse_human(other_fmt), 
+                                 ifelse(length(other_fmt) > 1, "were", "was"))
+            rarity_text <- paste(lead_txt, other_txt)
+          } else {
+            rarity_text <- lead_txt
+          }
+        }
+      }
+    }
+    
+    # Render UI Alert Box
     div(
       class = "alert alert-primary mb-3",
-      style = "font-size: 1.15rem; font-weight: 600;",
-      sprintf("In this session you recorded %d moth%s of %d species.", 
-              total_moths, ifelse(total_moths == 1, "", "s"), total_species)
+      style = "font-size: 1.05rem; line-height: 1.6;",
+      HTML(paste(
+        p(class = "mb-1", HTML(base_text)),
+        if (nchar(abundant_text) > 0) p(class = "mb-1", HTML(abundant_text)) else NULL,
+        if (nchar(rarity_text) > 0) p(class = "mb-0 text-dark", HTML(rarity_text)) else NULL
+      ))
     )
   })
   
@@ -1036,9 +1173,14 @@ server <- function(input, output, session) {
         card(
           fill = FALSE,
           class = "mb-4",
-          card_header("Temporary Files Cleanup Manager"),
+          card_header("File Cleanup & Management"),
           p(class = "text-muted small ms-3 mt-2", "Select a temporary backup file to preview, edit in session, append to master, or delete."),
           div(style = "overflow-x: auto; padding: 0 1rem;", DTOutput("admin_temp_files_table")),
+          fileInput(
+            inputId = "admin_master_upload",
+            label = "Upload New Master Database (.csv)",
+            accept = c(".csv", "text/csv", "text/comma-separated-values")
+          ),
           card_footer(
             div(
               class = "d-flex gap-2 flex-wrap",
@@ -1196,6 +1338,65 @@ server <- function(input, output, session) {
     
     species_df(load_and_clean_species(SPECIES_FILE, RECORDS_FILE))
     showNotification("Master records spreadsheet updated successfully!", type = "message", duration = 5)
+  })
+  
+  # 1. Trigger confirmation modal when a file is selected
+  observeEvent(input$admin_master_upload, {
+    req(input$admin_master_upload)
+    
+    showModal(modalDialog(
+      title = tagList(icon("exclamation-triangle"), " Warning: Overwrite Master Database"),
+      p("You are about to overwrite the master database file."),
+      p(strong("PERMANENT DATA LOSS RISK: "), "This action will permanently replace the active dataset with the uploaded file."),
+      p("We strongly recommend downloading a time-stamped backup of the current database before continuing."),
+      
+      footer = tagList(
+        downloadButton("download_master_backup", "Download Current Backup", class = "btn-info"),
+        actionButton("confirm_overwrite_master", "Confirm & Overwrite", class = "btn-danger"),
+        modalButton("Cancel")
+      ),
+      easyClose = FALSE
+    ))
+  })
+  
+  # 2. Download handler for time-stamped database backup
+  output$download_master_backup <- downloadHandler(
+    filename = function() {
+      paste0("master_moth_records_backup_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+    },
+    content = function(file) {
+      if (file.exists(RECORDS_FILE)) {
+        file.copy(RECORDS_FILE, file)
+      } else {
+        # Fallback if no file exists yet
+        write.csv(data.frame(), file, row.names = FALSE)
+      }
+    }
+  )
+  
+  # 3. Handle confirmed file overwrite
+  observeEvent(input$confirm_overwrite_master, {
+    req(input$admin_master_upload)
+    
+    tryCatch({
+      # Overwrite target file in TEMP_DIR
+      file.copy(
+        from = input$admin_master_upload$datapath,
+        to = RECORDS_FILE,
+        overwrite = TRUE
+      )
+      
+      # Reload active in-memory dataframe if your app uses a reload function
+      if (exists("load_master_df") && is.function(load_master_df)) {
+        load_master_df()
+      }
+      
+      removeModal()
+      showNotification("Master database successfully updated!", type = "message")
+    }, error = function(e) {
+      removeModal()
+      showNotification(paste("Error replacing file:", e$message), type = "error")
+    })
   })
   
   output$btn_download_master_csv <- downloadHandler(
